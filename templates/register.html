@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>Đăng ký tài khoản</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="../static/css/bootstrap.css" />
+    <link rel="stylesheet" href="../static/css/ui.css" />
+    <link rel="stylesheet" href="../static/css/responsive.css" />
+
+    <style>
+      body {
+        background: #f6f7fb;
+      }
+      .register-wrap {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="register-wrap">
+      <div class="container">
+        <div class="row justify-content-center">
+          <div class="col-md-6">
+            <div class="text-center mb-4">
+              <h3 class="font-weight-bold">Đăng ký tài khoản</h3>
+              <div class="text-muted">
+                Dành cho tài xế – hệ thống nội bộ công ty
+              </div>
+            </div>
+
+            <div class="card shadow-sm">
+              <div class="card-body p-4">
+                <form>
+                  <div class="form-group">
+                    <label>Họ và tên</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      placeholder="Nguyễn Văn A"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label>Tên đăng nhập</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      placeholder="username"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label>Số điện thoại</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      placeholder="0901 234 567"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label>Mật khẩu</label>
+                    <input
+                      type="password"
+                      class="form-control"
+                      placeholder="••••••••"
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label>Nhập lại mật khẩu</label>
+                    <input
+                      type="password"
+                      class="form-control"
+                      placeholder="••••••••"
+                    />
+                  </div>
+
+                  <button class="btn btn-primary btn-block">Đăng ký</button>
+                </form>
+
+                <div class="text-center text-muted small mt-3">
+                  Đã có tài khoản?
+                  <a href="login.html">Đăng nhập</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-center mt-3 text-muted small">
+              Việc đăng ký có thể cần admin phê duyệt
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="../static/js/jquery-2.0.0.min.js"></script>
+    <script src="../static/js/bootstrap.bundle.min.js"></script>
+    <script src="../static/js/script.js"></script>
+  </body>
+</html>

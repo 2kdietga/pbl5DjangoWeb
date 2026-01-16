@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>Danh sách vi phạm</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="../static/css/bootstrap.css" />
+    <link rel="stylesheet" href="../static/css/ui.css" />
+    <link rel="stylesheet" href="../static/css/responsive.css" />
+
+    <style>
+      body {
+        background: #f6f7fb;
+      }
+      .page-header {
+        padding: 20px 0;
+      }
+      .badge-pill {
+        border-radius: 999px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+      <div class="container">
+        <a class="navbar-brand font-weight-bold" href="#">QL Vi phạm</a>
+
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item active">
+            <a class="nav-link" href="#">Vi phạm</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">Thông tin cá nhân</a>
+          </li>
+        </ul>
+
+        <div>
+          <span class="text-muted mr-3">Nguyễn Văn A</span>
+          <a class="btn btn-outline-secondary btn-sm" href="#">Đăng xuất</a>
+        </div>
+      </div>
+    </nav>
+    {% block content %}
+    <!-- Content will be inserted here -->
+    {% endblock %}
+    <script src="{% static 'js/jquery-2.0.0.min.js' %}"></script>
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/script.js' %}"></script>
+  </body>
+</html>
