@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="vi">
   <head>
@@ -5,9 +6,9 @@
     <title>Đăng ký tài khoản</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <link rel="stylesheet" href="../static/css/bootstrap.css" />
-    <link rel="stylesheet" href="../static/css/ui.css" />
-    <link rel="stylesheet" href="../static/css/responsive.css" />
+    <link rel="stylesheet" href="{% static 'css/bootstrap.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/ui.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
 
     <style>
       body {
@@ -98,8 +99,8 @@
       </div>
     </div>
 
-    <script src="../static/js/jquery-2.0.0.min.js"></script>
-    <script src="../static/js/bootstrap.bundle.min.js"></script>
-    <script src="../static/js/script.js"></script>
+    <script src="{% static 'js/jquery-2.0.0.min.js' %}"></script>
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/script.js' %}"></script>
   </body>
 </html>
