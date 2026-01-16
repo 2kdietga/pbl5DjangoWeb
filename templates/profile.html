@@ -1,125 +1,58 @@
-<!DOCTYPE html>
-<html lang="vi">
-  <head>
-    <meta charset="utf-8" />
-    <title>Thông tin cá nhân</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+{% extends "base.html" %} {% block content %}
 
-    <link rel="stylesheet" href="../static/css/bootstrap.css" />
-    <link rel="stylesheet" href="../static/css/ui.css" />
-    <link rel="stylesheet" href="../static/css/responsive.css" />
-
-    <style>
-      body {
-        background: #f6f7fb;
-      }
-      .profile-avatar {
-        width: 96px;
-        height: 96px;
-        border-radius: 50%;
-        background: #e9ecef;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 32px;
-        font-weight: bold;
-        color: #6c757d;
-      }
-      .info-label {
-        color: #6c757d;
-        font-size: 14px;
-      }
-      .info-value {
-        font-weight: 500;
-      }
-    </style>
-  </head>
-  <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
-      <div class="container">
-        <a class="navbar-brand font-weight-bold" href="violations_list.html"
-          >QL Vi phạm</a
-        >
-
-        <ul class="navbar-nav mr-auto">
-          <li class="nav-item">
-            <a class="nav-link" href="violations_list.html">Vi phạm</a>
-          </li>
-          <li class="nav-item active">
-            <a class="nav-link" href="#">Thông tin cá nhân</a>
-          </li>
-        </ul>
-
-        <div>
-          <span class="text-muted mr-3">Nguyễn Văn A</span>
-          <a class="btn btn-outline-secondary btn-sm" href="login.html"
-            >Đăng xuất</a
-          >
-        </div>
-      </div>
-    </nav>
-
-    <div class="container mt-4">
-      <div class="row justify-content-center">
-        <div class="col-md-8">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="d-flex align-items-center mb-4">
-                <div class="profile-avatar mr-3">NA</div>
-                <div>
-                  <h4 class="mb-1">Nguyễn Văn A</h4>
-                  <div class="text-muted">Tài xế</div>
-                </div>
-              </div>
-
-              <hr />
-
-              <div class="row mb-3">
-                <div class="col-md-4 info-label">Mã tài xế</div>
-                <div class="col-md-8 info-value">DR-00123</div>
-              </div>
-
-              <div class="row mb-3">
-                <div class="col-md-4 info-label">Số điện thoại</div>
-                <div class="col-md-8 info-value">0901 234 567</div>
-              </div>
-
-              <div class="row mb-3">
-                <div class="col-md-4 info-label">Tên đăng nhập</div>
-                <div class="col-md-8 info-value">nguyenvana</div>
-              </div>
-
-              <div class="row mb-3">
-                <div class="col-md-4 info-label">Trạng thái</div>
-                <div class="col-md-8">
-                  <span class="badge badge-success">Đang hoạt động</span>
-                </div>
-              </div>
-
-              <div class="row mb-4">
-                <div class="col-md-4 info-label">Ngày tạo tài khoản</div>
-                <div class="col-md-8 info-value">01/01/2025</div>
-              </div>
-
-              <hr />
-
-              <div class="d-flex justify-content-between align-items-center">
-                <div class="text-muted small">
-                  Nếu thông tin không đúng, vui lòng liên hệ admin công ty
-                </div>
-                <a href="#" class="btn btn-light btn-sm" disabled>
-                  Chỉnh sửa
-                </a>
-              </div>
+<div class="container mt-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-4">
+            <div class="profile-avatar mr-3">NA</div>
+            <div>
+              <h4 class="mb-1">Nguyễn Văn A</h4>
+              <div class="text-muted">Tài xế</div>
             </div>
+          </div>
+
+          <hr />
+
+          <div class="row mb-3">
+            <div class="col-md-4 info-label">Mã tài xế</div>
+            <div class="col-md-8 info-value">DR-00123</div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-4 info-label">Số điện thoại</div>
+            <div class="col-md-8 info-value">0901 234 567</div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-4 info-label">Tên đăng nhập</div>
+            <div class="col-md-8 info-value">nguyenvana</div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-4 info-label">Trạng thái</div>
+            <div class="col-md-8">
+              <span class="badge badge-success">Đang hoạt động</span>
+            </div>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-md-4 info-label">Ngày tạo tài khoản</div>
+            <div class="col-md-8 info-value">01/01/2025</div>
+          </div>
+
+          <hr />
+
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="text-muted small">
+              Nếu thông tin không đúng, vui lòng liên hệ admin công ty
+            </div>
+            <a href="#" class="btn btn-light btn-sm" disabled> Chỉnh sửa </a>
           </div>
         </div>
       </div>
     </div>
-
-    <script src="../static/js/jquery-2.0.0.min.js"></script>
-    <script src="../static/js/bootstrap.bundle.min.js"></script>
-    <script src="../static/js/script.js"></script>
-  </body>
-</html>
+  </div>
+</div>
+{% endblock %}
