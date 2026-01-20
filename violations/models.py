@@ -13,6 +13,10 @@ class Violation(models.Model):
     reported_at = models.DateTimeField(auto_now_add=True)
     image = models.ImageField(upload_to='violations/', null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Violation"
+        verbose_name_plural = "Violations"
+        ordering = ['-reported_at']
 
     def __str__(self):
         return self.title
