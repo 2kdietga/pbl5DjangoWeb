@@ -1,4 +1,5 @@
-from django.shortcuts import render
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, render
 from categories.models import Category
 from .models import Violation
 
@@ -36,3 +37,13 @@ def violation_list(request):
         "selected_category": category_id,
     }
     return render(request, "violation_list.html", context)
+
+def violation_detail(request, violation_id):
+    violation = Violation.objects.select_related("category", "vehicle").get(id=violation_id)
+    # Đánh dấu vi phạm là đã xem
+    violation.viewed = True
+    violation.save()
+    context = {
+        "violation": violation,
+    }
+    return render(request, "violation_detail.html", context)

@@ -69,9 +69,14 @@
                 {% else %} Nhắc nhở {% endif %}
               </span>
             </td>
-            <td><span class="badge badge-secondary">Chưa xem</span></td>
+            <td>
+              {% if violation.viewed %}
+              <span class="badge badge-success">Đã xem</span>
+              {% else %}
+              <span class="badge badge-light border">Chưa xem</span>
+              {% endif %}
             <td class="text-right">
-              <a class="btn btn-light btn-sm" href="#">
+              <a class="btn btn-light btn-sm" href="{% url 'violation_detail' violation.id %}">
   Chi tiết
 </a>
             </td>   

@@ -54,6 +54,9 @@ class Account(AbstractBaseUser):
 
     objects = MyAccountManager()
 
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
     @property
     def get_avatar(self):
         # Lấy ảnh được đánh dấu là is_avatar, nếu không có thì lấy ảnh đầu tiên
@@ -80,3 +83,5 @@ class UserImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.user.email}"
+    
+

@@ -12,6 +12,7 @@ class Violation(models.Model):
     description = models.TextField()
     reported_at = models.DateTimeField(auto_now_add=True)
     image = models.ImageField(upload_to='violations/', null=True, blank=True)
+    viewed = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Violation"
