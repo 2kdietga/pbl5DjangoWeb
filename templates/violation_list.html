@@ -23,9 +23,9 @@
     <label class="form-label">Loại lỗi</label>
     <select class="form-control" name="category">
       <option value="">Tất cả</option>
-      {% for category in categories %}
-        <option value="{{ category.id }}" {% if category.id|stringformat:"s" == selected_category %}selected{% endif %}>
-          {{ category.name }}
+      {% for category in links %}
+      <option value="{{ category.id }}" {% if category.id|stringformat:"s" == selected_category %} selected {% endif %}>
+        {{ category.name }}
         </option>
       {% endfor %}
     </select>
@@ -56,6 +56,13 @@
           </tr>
         </thead>
         <tbody>
+          {% if not violations %}
+          <tr>
+            <td colspan="6" class="text-center text-muted">
+              Không có vi phạm nào.
+            </td>
+          </tr>
+          {% endif %}
           {% for violation in violations %}
           <tr>
             <td>{{ violation.reported_at }}</td>

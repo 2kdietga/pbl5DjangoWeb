@@ -1,43 +1,45 @@
-from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render
-from categories.models import Category
-from .models import Violation
-
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils.dateparse import parse_date
-from .models import Violation, Category
 
+from .models import Violation
+from categories.models import Category  # hoặc import đúng chỗ Category của bạn
+
+@login_required
 def violation_list(request):
-    qs = Violation.objects.select_related("category", "vehicle").all().order_by("-reported_at")
-    categories = Category.objects.all().order_by("name")
+    # Chỉ lấy vi phạm của user đang đăng nhập
+    qs = Violation.objects.filter(reporter=request.user).select_related(
+        "category", "vehicle", "reporter"
+    ).order_by("-reported_at")
 
-    from_date = request.GET.get("from_date", "")
-    to_date = request.GET.get("to_date", "")
-    category_id = request.GET.get("category", "")
+    # Lấy dữ liệu filter từ querystring
+    from_date_str = request.GET.get("from_date", "").strip()
+    to_date_str = request.GET.get("to_date", "").strip()
+    selected_category = request.GET.get("category", "").strip()
+
+    # Filter theo ngày (reported_at là DateTimeField)
+    from_date = parse_date(from_date_str) if from_date_str else None
+    to_date = parse_date(to_date_str) if to_date_str else None
 
     if from_date:
-        d = parse_date(from_date)
-        if d:
-            qs = qs.filter(reported_at__date__gte=d)
-
+        qs = qs.filter(reported_at__date__gte=from_date)
     if to_date:
-        d = parse_date(to_date)
-        if d:
-            qs = qs.filter(reported_at__date__lte=d)
+        qs = qs.filter(reported_at__date__lte=to_date)
 
-    if category_id:
-        qs = qs.filter(category_id=category_id)
+    # Filter theo category
+    if selected_category:
+        qs = qs.filter(category_id=selected_category)
 
     context = {
         "violations": qs,
-        "categories": categories,
-        # để giữ lại trạng thái filter trên UI
-        "from_date": from_date,
-        "to_date": to_date,
-        "selected_category": category_id,
+        "links": Category.objects.all().order_by("name"),  # danh sách category cho dropdown
+        "from_date": from_date_str,
+        "to_date": to_date_str,
+        "selected_category": selected_category,
     }
     return render(request, "violation_list.html", context)
 
+@login_required
 def violation_detail(request, violation_id):
     violation = Violation.objects.select_related("category", "vehicle").get(id=violation_id)
     # Đánh dấu vi phạm là đã xem

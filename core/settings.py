@@ -66,6 +66,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'categories.context_processors.menu_links',
             ],
         },
     },
@@ -74,6 +75,9 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 AUTH_USER_MODEL = 'accounts.Account'
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'violation_list'
+LOGOUT_REDIRECT_URL = 'login'
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases

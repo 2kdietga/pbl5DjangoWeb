@@ -1,5 +1,5 @@
 {% load static %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
   <head>
     <meta charset="utf-8" />
@@ -21,6 +21,7 @@
       }
     </style>
   </head>
+
   <body>
     <div class="login-wrap">
       <div class="container">
@@ -33,13 +34,24 @@
 
             <div class="card shadow-sm">
               <div class="card-body p-4">
-                <form>
+                {% if messages %} {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} mb-3" role="alert">
+                  {{ message }}
+                </div>
+                {% endfor %} {% endif %}
+
+                <form method="POST" action="{% url 'login' %}">
+                  {% csrf_token %}
+
                   <div class="form-group">
-                    <label>Tên đăng nhập</label>
+                    <label>Email</label>
                     <input
-                      type="text"
+                      type="email"
+                      name="email"
                       class="form-control"
-                      placeholder="username"
+                      placeholder="email@example.com"
+                      required
+                      autofocus
                     />
                   </div>
 
@@ -47,16 +59,22 @@
                     <label>Mật khẩu</label>
                     <input
                       type="password"
+                      name="password"
                       class="form-control"
-                      placeholder="••••••••"
+                      required
                     />
                   </div>
 
-                  <button class="btn btn-primary btn-block">Đăng nhập</button>
+                  <button type="submit" class="btn btn-primary btn-block">
+                    Đăng nhập
+                  </button>
                 </form>
 
-                <div class="text-center text-muted small mt-3">
-                  Quên mật khẩu? Liên hệ admin
+                <div class="text-center small mt-3">
+                  Chưa có tài khoản?
+                  <a href="{% url 'register' %}" class="font-weight-bold">
+                    Tạo tài khoản
+                  </a>
                 </div>
               </div>
             </div>

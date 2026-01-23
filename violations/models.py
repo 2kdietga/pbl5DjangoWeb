@@ -8,7 +8,7 @@ class Violation(models.Model):
     reporter = models.ForeignKey(Account, on_delete=models.CASCADE)
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE)
 
-    title = models.CharField(max_length=200)
+    title = models.CharField(max_length=200, default ="Violation Report") 
     description = models.TextField()
     reported_at = models.DateTimeField(auto_now_add=True)
     image = models.ImageField(upload_to='violations/', null=True, blank=True)
@@ -20,4 +20,4 @@ class Violation(models.Model):
         ordering = ['-reported_at']
 
     def __str__(self):
-        return self.title
+        return self.reporter.get_full_name() + " - " + self.category.name
