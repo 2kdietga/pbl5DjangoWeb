@@ -22,8 +22,9 @@ from accounts.views import login_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', login_view, name='login'),
     path('categories/', include('categories.urls')),
     path('violations/', include('violations.urls')),
     path('accounts/', include('accounts.urls')),
-    path('', login_view, name='login'),
+    path('api/', include('api.urls')),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
