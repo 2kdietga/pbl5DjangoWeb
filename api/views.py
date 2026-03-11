@@ -1,48 +1,116 @@
-import os
-import secrets
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.core.files.storage import default_storage
 from django.utils import timezone
+from django.conf import settings
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
+from accounts.models import Account
+from categories.models import Category
+from vehicles.models import Vehicle
+from violations.models import Violation
 from devices.models import Device
 
+from ai.engine import predict_violation
 
-@csrf_exempt
-def upload_frame(request):
-    if request.method != "POST":
-        return JsonResponse({"ok": False, "error": "POST only"}, status=405)
 
-    # 1) lấy token từ header (khuyên dùng)
-    token = request.headers.get("X-DEVICE-TOKEN") or request.META.get("HTTP_X_DEVICE_TOKEN")
-    if not token:
-        return JsonResponse({"ok": False, "error": "Missing X-DEVICE-TOKEN"}, status=401)
+class UploadAndDetectAPIView(APIView):
+    """
+    ESP32-CAM gửi:
+      - Header: X-DEVICE-TOKEN
+      - Form-data: image=@file.jpg
+      - (optional) license_plate=... nếu device chưa gắn vehicle
+    """
 
-    # 2) tìm device
-    device = Device.objects.filter(token=token, is_active=True).first()
-    if not device:
-        return JsonResponse({"ok": False, "error": "Invalid device token"}, status=401)
+    authentication_classes = []
+    permission_classes = []
 
-    # 3) lấy file ảnh
-    f = request.FILES.get("image")
-    if not f:
-        return JsonResponse({"ok": False, "error": "Missing file field 'image'"}, status=400)
+    def post(self, request):
+        # 1) Validate token -> device
+        token = request.headers.get("X-DEVICE-TOKEN")
+        if not token:
+            return Response({"detail": "Missing X-DEVICE-TOKEN"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    # 4) update last_seen
-    device.last_seen = timezone.now()
-    device.save(update_fields=["last_seen"])
+        device = Device.objects.filter(token=token, is_active=True).select_related("vehicle").first()
+        if not device:
+            return Response({"detail": "Invalid device token"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    # 5) lưu ảnh vào media/frames/<device_id>/
-    ext = os.path.splitext(f.name)[1].lower()
-    if ext not in [".jpg", ".jpeg", ".png", ".webp", ".bmp"]:
-        ext = ".jpg"
+        device.last_seen = timezone.now()
+        device.save(update_fields=["last_seen"])
 
-    filename = f"{timezone.now().strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(4)}{ext}"
-    path = f"frames/device_{device.id}/{filename}"
-    saved_path = default_storage.save(path, f)
+        # 2) Validate image
+        image = request.FILES.get("image")
+        if not image:
+            return Response({"detail": "Missing image (field name must be 'image')"}, status=status.HTTP_400_BAD_REQUEST)
 
-    return JsonResponse({
-        "ok": True,
-        "device": {"id": device.id, "name": device.name},
-        "saved": saved_path,
-        "vehicle": device.vehicle.license_plate if device.vehicle else None,
-    })
+        # 3) Get vehicle (from device or from request)
+        vehicle = device.vehicle
+        if vehicle is None:
+            license_plate = (request.data.get("license_plate") or "").strip()
+            model_name = (request.data.get("model") or "Unknown").strip()
+            reg_date = request.data.get("registration_date")  # "YYYY-MM-DD" (optional)
+
+            if not license_plate:
+                return Response(
+                    {"detail": "Device has no vehicle. Send license_plate or assign vehicle to device."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            vehicle, _ = Vehicle.objects.get_or_create(
+                license_plate=license_plate,
+                defaults={
+                    "model": model_name,
+                    "registration_date": reg_date or timezone.now().date(),
+                },
+            )
+            device.vehicle = vehicle
+            device.save(update_fields=["vehicle"])
+
+        # 4) AI predict
+        pred_idx, confidence, probs = predict_violation(image)
+
+        threshold = float(getattr(settings, "AI_CONF_THRESHOLD", 0.70))
+        class_to_category = getattr(settings, "AI_CLASS_TO_CATEGORY", {pred_idx: f"C{pred_idx}"})
+        cat_name = class_to_category.get(pred_idx, f"C{pred_idx}")
+
+        is_violation = confidence >= threshold
+
+        # 5) Nếu không vi phạm -> trả luôn, không lưu ảnh/DB
+        if not is_violation or class_to_category.get(pred_idx) == "C0":
+            return Response({
+                "ok": True,
+                "violation": False,
+                "pred_class": pred_idx,
+                "confidence": confidence,
+                "category_guess": cat_name,
+                "probs": probs,
+                "vehicle": vehicle.license_plate,
+            }, status=status.HTTP_200_OK)
+
+        # 6) Vi phạm -> tạo Violation với reporter mặc định id=1
+        reporter = Account.objects.filter(id=1).first()
+        if not reporter:
+            return Response({"detail": "Default reporter Account id=1 not found"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        category, _ = Category.objects.get_or_create(name=cat_name)
+
+        violation = Violation.objects.create(
+            category=category,
+            reporter=reporter,
+            vehicle=vehicle,
+            title="Violation Report",
+            description=f"AI detected {cat_name} (confidence={confidence:.3f})",
+        )
+
+        # chỉ lưu ảnh khi vi phạm
+        violation.image.save(image.name, image, save=True)
+
+        return Response({
+            "ok": True,
+            "violation": True,
+            "violation_id": violation.id,
+            "pred_class": pred_idx,
+            "confidence": confidence,
+            "category": category.name,
+            "vehicle": vehicle.license_plate,
+        }, status=status.HTTP_201_CREATED)

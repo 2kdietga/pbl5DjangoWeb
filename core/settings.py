@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -37,12 +38,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'categories',
     'accounts',
     'violations',
     'vehicles',
     'api',
     'devices',
+    'ai',
 ]
 
 MIDDLEWARE = [
@@ -80,6 +83,11 @@ AUTH_USER_MODEL = 'accounts.Account'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'violation_list'
 LOGOUT_REDIRECT_URL = 'login'
+
+
+# AI Settings
+AI_MODEL_PATH = BASE_DIR / "ai" / "models" / "driver_actions.h5"
+AI_IMG_SIZE = (256, 256)   # sửa đúng size lúc train (vd: 224 hoặc 256)
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases

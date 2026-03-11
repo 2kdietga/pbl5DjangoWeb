@@ -2,5 +2,5 @@ from . import views
 from django.urls import path
 
 urlpatterns = [
-    path("upload/", views.upload_frame, name="upload_frame"),
+    path("upload/", views.UploadAndDetectAPIView.as_view(), name="upload_and_detect"),
 ]
