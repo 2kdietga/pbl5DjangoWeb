@@ -31,15 +31,19 @@ class MyAccountManager(BaseUserManager):
         user.is_active = True
         user.is_staff = True
         user.is_superadmin = True
-        user.save(using=self._db)       
+        user.save(using=self._db)
         return user
+
 
 class Account(AbstractBaseUser):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     username = models.CharField(max_length=50, unique=True)
     email = models.EmailField(max_length=100, unique=True)
-    phone_number = models.CharField(max_length=15)
+    phone_number = models.CharField(max_length=15, blank=True)
+
+    # Mã thẻ từ / UID thẻ RFID
+    card_uid = models.CharField(max_length=50, unique=True, null=True, blank=True)
 
     # Required fields
     date_joined = models.DateTimeField(auto_now_add=True)
@@ -59,7 +63,6 @@ class Account(AbstractBaseUser):
 
     @property
     def get_avatar(self):
-        # Lấy ảnh được đánh dấu là is_avatar, nếu không có thì lấy ảnh đầu tiên
         avatar = self.images.filter(is_avatar=True).first()
         if not avatar:
             avatar = self.images.first()
@@ -77,11 +80,9 @@ class Account(AbstractBaseUser):
 
 class UserImage(models.Model):
     user = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='images')
-    image = models.ImageField(upload_to='user_photos/') # Ảnh sẽ lưu trong thư mục media/user_photos/
-    is_avatar = models.BooleanField(default=False) # Đánh dấu ảnh nào dùng làm avatar
+    image = models.ImageField(upload_to='user_photos/')
+    is_avatar = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Image for {self.user.email}"
-    
-

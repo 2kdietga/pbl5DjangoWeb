@@ -34,6 +34,7 @@ class AccountAdmin(UserAdmin):
     list_display = ('email', 'first_name', 'last_name', 'image_count_display', 'is_active')
     list_display_links = ('email', 'first_name', 'last_name')
     readonly_fields = ('last_login', 'date_joined')
+    search_fields = ('email', 'username', 'first_name', 'last_name', 'card_uid')
 
     # Thêm bộ lọc vừa tạo vào list_filter
     list_filter = (ImageCountFilter, 'is_active', 'is_staff')

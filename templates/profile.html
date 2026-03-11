@@ -1,8 +1,12 @@
-{% extends "base.html" %} {% load static %}
+{% extends "base.html" %}
+<!--  -->
+{% load static %}
 <!--  -->
 {% block title %}Thông tin cá nhân
 <!--  -->
-{% endblock %} {% block content %}
+{% endblock %}
+<!--  -->
+{% block content %}
 <div class="page-header d-flex justify-content-between align-items-center">
   <div>
     <h4 class="mb-1">Thông tin cá nhân</h4>
@@ -61,6 +65,10 @@
             <span class="text-muted">SĐT</span>
             <span>{{ request.user.phone_number|default:"-" }}</span>
           </div>
+          <div class="d-flex justify-content-between mt-2">
+            <span class="text-muted">Mã thẻ</span>
+            <span>{{ request.user.card_uid|default:"Chưa gán" }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -76,11 +84,7 @@
           <div class="form-row">
             <div class="form-group col-md-6">
               <label>Họ</label>
-              {{ form.last_name }} {% if not edit %}<small
-                class="text-muted d-block mt-1"
-              >
-              </small
-              >{% endif %} {% if form.last_name.errors %}
+              {{ form.last_name }} {% if form.last_name.errors %}
               <div class="text-danger small mt-1">
                 {{ form.last_name.errors|striptags }}
               </div>
@@ -125,7 +129,6 @@
             </div>
             {% endif %}
           </div>
-
           {% if edit %}
           <div class="d-flex justify-content-end">
             <a href="{% url 'profile' %}" class="btn btn-light mr-2">Huỷ</a>
@@ -140,12 +143,13 @@
 
 {% if not edit %}
 <script>
-  // Khi không edit: khoá toàn bộ input/select/textarea trong form
   (function () {
     document
       .querySelectorAll("form input, form select, form textarea")
       .forEach(function (el) {
-        el.setAttribute("disabled", "disabled");
+        if (!el.hasAttribute("disabled")) {
+          el.setAttribute("disabled", "disabled");
+        }
       });
   })();
 </script>
