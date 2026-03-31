@@ -1,0 +1,8 @@
+Django==5.0.14
+djangorestframework
+Pillow
+numpy
+opencv-python
+mediapipe==0.10.13
+torch
+torchvision

@@ -86,9 +86,23 @@ LOGOUT_REDIRECT_URL = 'login'
 
 
 # AI Settings
-AI_MODEL_PATH = BASE_DIR / "ai" / "models" / "driver_actions.h5"
-AI_IMG_SIZE = (256, 256)   # sửa đúng size lúc train (vd: 224 hoặc 256)
-
+AI_MODEL_PATH = BASE_DIR / "ai" / "models" / "best_hybrid_model.pth"
+AI_IMG_SIZE = (256, 256)
+AI_DEVICE = "cuda"   # hoặc "cpu"
+AI_CLASS_NAMES = [
+    "class_interior",
+    "class_personal",
+    "class_phone",
+    "class_safe",
+]
+AI_CONF_THRESHOLD = 0.70   # Ngưỡng confidence để xác định vi phạm
+AI_VIOLATION_COOLDOWN_SECONDS = 10 # Thời gian chờ giữa các vi phạm của cùng 1 xe (theo license plate)
+AI_CLASS_TO_CATEGORY = {
+    "class_interior": "Interior",
+    "class_personal": "Personal",
+    "class_phone": "Phone",
+    "class_safe": "Safe",
+}
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
