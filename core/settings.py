@@ -95,7 +95,7 @@ AI_CLASS_NAMES = [
     "class_phone",
     "class_safe",
 ]
-AI_CONF_THRESHOLD = 0.70   # Ngưỡng confidence để xác định vi phạm
+AI_CONF_THRESHOLD = 0.4   # Ngưỡng confidence để xác định vi phạm
 AI_VIOLATION_COOLDOWN_SECONDS = 10 # Thời gian chờ giữa các vi phạm của cùng 1 xe (theo license plate)
 AI_CLASS_TO_CATEGORY = {
     "class_interior": "Interior",

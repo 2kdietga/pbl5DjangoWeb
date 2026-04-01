@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Live Camera - Device {{ device.id }}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #111;
+        color: white;
+        text-align: center;
+        margin: 0;
+        padding: 20px;
+      }
+
+      h1 {
+        margin-bottom: 10px;
+      }
+
+      .meta {
+        margin-bottom: 20px;
+        color: #bbb;
+      }
+
+      img {
+        width: 90%;
+        max-width: 900px;
+        border: 3px solid #444;
+        border-radius: 12px;
+        background: #222;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Live Camera - Device {{ device.id }}</h1>
+    <div class="meta">
+      Device: {{ device.name }} | Last frame: {{
+      device.latest_frame_at|default:"Chưa có ảnh" }}
+    </div>
+
+    <img id="camera" src="/devices/{{ device.id }}/frame/" alt="Live camera" />
+
+    <script>
+      const img = document.getElementById("camera");
+      const intervalMs = 500; // đổi xuống 300 nếu muốn mượt hơn
+
+      setInterval(() => {
+        img.src = "/devices/{{ device.id }}/frame/?t=" + new Date().getTime();
+      }, intervalMs);
+    </script>
+  </body>
+</html>

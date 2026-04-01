@@ -16,5 +16,9 @@ class Device(models.Model):
     last_seen = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    latest_frame = models.ImageField(upload_to='live/', null=True, blank=True)
+    latest_frame_at = models.DateTimeField(null=True, blank=True)
+
+
     def __str__(self):
         return self.name

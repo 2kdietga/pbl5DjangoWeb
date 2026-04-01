@@ -9,6 +9,7 @@ from rest_framework import status
 
 from accounts.models import Account
 from categories.models import Category
+from devices.services import save_latest_frame
 from vehicles.models import Vehicle
 from violations.models import Violation
 from devices.models import Device
@@ -50,7 +51,9 @@ class UploadAndDetectAPIView(APIView):
                 {"detail": "Missing image (field name must be 'image')"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
+        # NEW: cập nhật frame mới nhất của device
+        save_latest_frame(device, image)
+        image.seek(0)
         # 3) card_uid
         card_uid = (request.data.get("card_uid") or "").strip()
         if not card_uid:
