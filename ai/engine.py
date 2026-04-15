@@ -20,7 +20,7 @@ CLASS_NAMES = getattr(
 )
 
 AI_DEVICE = getattr(settings, "AI_DEVICE", "cuda")
-IMG_SIZE = getattr(settings, "AI_IMG_SIZE", (256, 256))
+IMG_SIZE = getattr(settings, "AI_IMG_SIZE", 224)
 
 
 # =========================================================
@@ -56,13 +56,13 @@ class HybridModel(nn.Module):
         )
 
     def forward(self, image, skeleton):
-        x1 = self.cnn_feature_extractor(image)  # [B, 960, H, W]
-        x1 = self.avgpool(x1)                   # [B, 960, 1, 1]
-        x1 = torch.flatten(x1, 1)              # [B, 960]
+        x1 = self.cnn_feature_extractor(image)   # [B, 960, H, W]
+        x1 = self.avgpool(x1)                    # [B, 960, 1, 1]
+        x1 = torch.flatten(x1, 1)               # [B, 960]
 
-        x2 = self.skeleton_mlp(skeleton)       # [B, 128]
+        x2 = self.skeleton_mlp(skeleton)        # [B, 128]
 
-        x_cat = torch.cat((x1, x2), dim=1)     # [B, 1088]
+        x_cat = torch.cat((x1, x2), dim=1)      # [B, 1088]
         return self.classifier(x_cat)
 
 
@@ -74,8 +74,7 @@ _device = None
 _pose = None
 
 _transform = transforms.Compose([
-    transforms.Resize((256, 256)),
-    transforms.CenterCrop((224, 224)),
+    transforms.Resize((IMG_SIZE, IMG_SIZE)),
     transforms.ToTensor(),
     transforms.Normalize(
         mean=[0.485, 0.456, 0.406],
@@ -95,6 +94,14 @@ def get_device():
     return _device
 
 
+def _clean_state_dict(state_dict):
+    cleaned = {}
+    for k, v in state_dict.items():
+        new_key = k.replace("module.", "")
+        cleaned[new_key] = v
+    return cleaned
+
+
 def get_model():
     global _model
 
@@ -106,13 +113,13 @@ def get_model():
 
         checkpoint = torch.load(model_path, map_location=device)
 
-        # hỗ trợ cả 2 kiểu:
-        # 1) raw state_dict
-        # 2) dict có key 'state_dict'
+        # hỗ trợ nhiều kiểu lưu checkpoint
         if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
             state_dict = checkpoint["state_dict"]
         else:
             state_dict = checkpoint
+
+        state_dict = _clean_state_dict(state_dict)
 
         model.load_state_dict(state_dict, strict=True)
         model.to(device)
@@ -129,17 +136,13 @@ def get_pose():
         mp_pose = mp.solutions.pose
         _pose = mp_pose.Pose(
             static_image_mode=True,
+            model_complexity=1,
             min_detection_confidence=0.5
         )
     return _pose
 
 
 def _read_image_file_safely(image_file):
-    """
-    Đọc UploadedFile an toàn để:
-    - predict xong vẫn có thể save lại file ở nơi khác
-    - tránh lỗi con trỏ file
-    """
     if hasattr(image_file, "seek"):
         image_file.seek(0)
 
@@ -158,7 +161,7 @@ def _extract_skeleton_vector(image_pil):
     - skeleton_vector: np.ndarray shape (132,)
     - skeleton_detected: bool
     """
-    image_np = np.array(image_pil)
+    image_np = np.array(image_pil)  # PIL RGB -> numpy RGB
     pose = get_pose()
     results = pose.process(image_np)
 
@@ -179,10 +182,12 @@ def _extract_skeleton_vector(image_pil):
 def _prepare_inputs(image_file):
     image_pil = _read_image_file_safely(image_file)
 
-    image_tensor = _transform(image_pil).unsqueeze(0)  # [1, 3, 224, 224]
+    image_tensor = _transform(image_pil).unsqueeze(0)  # [1, 3, IMG_SIZE, IMG_SIZE]
 
     skeleton_vector, skeleton_detected = _extract_skeleton_vector(image_pil)
-    skeleton_tensor = torch.tensor(skeleton_vector, dtype=torch.float32).unsqueeze(0)  # [1,132]
+    skeleton_tensor = torch.tensor(
+        skeleton_vector, dtype=torch.float32
+    ).unsqueeze(0)  # [1, 132]
 
     return image_tensor, skeleton_tensor, skeleton_detected
 
@@ -214,7 +219,6 @@ def predict_violation(image_file):
     with torch.no_grad():
         outputs = model(image_tensor, skeleton_tensor)
         probs = F.softmax(outputs, dim=1)[0]
-
         confidence, predicted_idx = torch.max(probs, dim=0)
 
     pred_idx = int(predicted_idx.item())

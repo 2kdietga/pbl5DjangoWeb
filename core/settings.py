@@ -87,7 +87,7 @@ LOGOUT_REDIRECT_URL = 'login'
 
 # AI Settings
 AI_MODEL_PATH = BASE_DIR / "ai" / "models" / "best_hybrid_model.pth"
-AI_IMG_SIZE = (256, 256)
+AI_IMG_SIZE = 224
 AI_DEVICE = "cuda"   # hoặc "cpu"
 AI_CLASS_NAMES = [
     "class_interior",
@@ -95,10 +95,10 @@ AI_CLASS_NAMES = [
     "class_phone",
     "class_safe",
 ]
-AI_CONF_THRESHOLD = 0.4   # Ngưỡng confidence để xác định vi phạm
+AI_CONF_THRESHOLD = 0.5   # Ngưỡng confidence để xác định vi phạm
 AI_VIOLATION_COOLDOWN_SECONDS = 10 # Thời gian chờ giữa các vi phạm của cùng 1 xe (theo license plate)
 AI_CLASS_TO_CATEGORY = {
-    "class_interior": "Interior",
+    "class_interior": "Phone",
     "class_personal": "Personal",
     "class_phone": "Phone",
     "class_safe": "Safe",
