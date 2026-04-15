@@ -86,23 +86,48 @@ LOGOUT_REDIRECT_URL = 'login'
 
 
 # AI Settings
-AI_MODEL_PATH = BASE_DIR / "ai" / "models" / "best_hybrid_model.pth"
-AI_IMG_SIZE = 224
-AI_DEVICE = "cuda"   # hoặc "cpu"
-AI_CLASS_NAMES = [
-    "class_interior",
-    "class_personal",
-    "class_phone",
-    "class_safe",
-]
-AI_CONF_THRESHOLD = 0.5   # Ngưỡng confidence để xác định vi phạm
-AI_VIOLATION_COOLDOWN_SECONDS = 10 # Thời gian chờ giữa các vi phạm của cùng 1 xe (theo license plate)
-AI_CLASS_TO_CATEGORY = {
-    "class_interior": "Phone",
-    "class_personal": "Personal",
-    "class_phone": "Phone",
-    "class_safe": "Safe",
-}
+# AI_MODEL_PATH = BASE_DIR / "ai" / "models" / "best_hybrid_model.pth"
+# AI_IMG_SIZE = 224
+# AI_DEVICE = "cuda"   # hoặc "cpu"
+# AI_CLASS_NAMES = [
+#     "class_interior",
+#     "class_personal",
+#     "class_phone",
+#     "class_safe",
+# ]
+# AI_CONF_THRESHOLD = 0.5   # Ngưỡng confidence để xác định vi phạm
+# AI_VIOLATION_COOLDOWN_SECONDS = 10 # Thời gian chờ giữa các vi phạm của cùng 1 xe (theo license plate)
+# AI_CLASS_TO_CATEGORY = {
+#     "class_interior": "Phone",
+#     "class_personal": "Personal",
+#     "class_phone": "Phone",
+#     "class_safe": "Safe",
+# }
+
+
+# DROWSINESS SETTINGS
+DROWSINESS_MODEL_PATH = BASE_DIR / "ai" / "models" / "face_landmarker.task"
+DROWSINESS_FPS_ASSUMED = 5.0   # nếu ESP32 gửi 0.5s / ảnh
+
+DROWSINESS_MODEL_PATH = BASE_DIR / "ai" / "models" / "face_landmarker.task"
+DROWSINESS_FPS_ASSUMED = 2.0
+DROWSINESS_STATE_TIMEOUT_SECONDS = 8
+
+DROWSINESS_LOW_LIGHT_THRESHOLD = 60
+DROWSINESS_HEAD_DROP_PITCH = 10.0
+DROWSINESS_EYE_CLOSED_RATIO = 0.75
+DROWSINESS_MAR_YAWN_RATIO = 1.5
+
+DROWSINESS_CALIB_PITCH_STD_MAX = 5.0
+DROWSINESS_CALIB_EAR_STD_MAX = 0.04
+
+DROWSINESS_WARN_THRESHOLD = 35
+DROWSINESS_DANGER_THRESHOLD = 60
+DROWSINESS_WARN_THRESHOLD_HYST = 25
+DROWSINESS_DANGER_THRESHOLD_HYST = 50
+DROWSINESS_DANGER_THRESHOLD_UP_FROM_WARN = 65
+
+DROWSINESS_EYE_CLOSED_TRIGGER_FRAMES = 10
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 

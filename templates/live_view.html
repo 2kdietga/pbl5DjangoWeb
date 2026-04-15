@@ -29,10 +29,18 @@
         border-radius: 12px;
         background: #222;
       }
+
+      #statusBox {
+        margin-top: 20px;
+        font-size: 22px;
+        font-weight: bold;
+      }
     </style>
   </head>
+
   <body>
     <h1>Live Camera - Device {{ device.id }}</h1>
+
     <div class="meta">
       Device: {{ device.name }} | Last frame: {{
       device.latest_frame_at|default:"Chưa có ảnh" }}
@@ -40,13 +48,48 @@
 
     <img id="camera" src="/devices/{{ device.id }}/frame/" alt="Live camera" />
 
+    <!-- 🔥 STATUS -->
+    <div id="statusBox">
+      <div>Status: <span id="status">...</span></div>
+      <div>Streak: <span id="streak">0</span></div>
+    </div>
+
     <script>
       const img = document.getElementById("camera");
-      const intervalMs = 500; // đổi xuống 300 nếu muốn mượt hơn
+      const statusText = document.getElementById("status");
+      const streakText = document.getElementById("streak");
 
+      const intervalMs = 500;
+
+      // ===== LOAD FRAME =====
       setInterval(() => {
         img.src = "/devices/{{ device.id }}/frame/?t=" + new Date().getTime();
       }, intervalMs);
+
+      function updateStatus() {
+        fetch("/devices/{{ device.id }}/live/", {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            const streak = data.streak || 0;
+
+            streakText.innerText = streak;
+
+            if (streak >= 6) {
+              statusText.innerText = "NGỦ GỤC";
+              statusText.style.color = "red";
+            } else if (streak > 0) {
+              statusText.innerText = "ĐANG NHẮM MẮT";
+              statusText.style.color = "orange";
+            } else {
+              statusText.innerText = "TỈNH TÁO";
+              statusText.style.color = "lime";
+            }
+          });
+      }
+
+      setInterval(updateStatus, intervalMs);
     </script>
   </body>
 </html>
