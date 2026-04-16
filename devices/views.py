@@ -1,6 +1,7 @@
 import os
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, render
+from rest_framework import settings
 
 from ai.drowsiness.state import STATE_STORE
 from .models import Device
@@ -34,4 +35,4 @@ def device_live_view(request, id):
         })
 
     # nếu load page
-    return render(request, "live_view.html", {"device": device})
+    return render(request, "live_view.html", {"device": device, "DROWSINESS_EYE_CLOSED_FRAMES": getattr(settings, "DROWSINESS_EYE_CLOSED_FRAMES", 8)})

@@ -7,6 +7,7 @@ from PIL import Image
 from .state import get_state
 from .metrics import get_ear
 from .mediapipe_loader import get_landmarker
+from django.conf import settings
 
 
 def read_image(image_file):
@@ -37,6 +38,7 @@ def process_frame(image_file, device_key):
     # ❌ không thấy mặt
     if not result.face_landmarks:
         state.eye_closed_streak = 0
+        state.is_sleeping = False
         return {
             "status": "NO_FACE",
             "should_create_violation": False
@@ -65,8 +67,8 @@ def process_frame(image_file, device_key):
 
     # ===== DETECT =====
     is_eye_closed = (
-        ear < state.baseline_ear * 0.85
-        or ear < 0.20
+        ear < state.baseline_ear * getattr(settings, "DROWSINESS_EYE_CLOSED_RATIO", 0.85)
+        or ear < getattr(settings, "DROWSINESS_EYE_CLOSED_ABS", 0.20)
     )
 
     if is_eye_closed:
@@ -75,7 +77,7 @@ def process_frame(image_file, device_key):
         state.eye_closed_streak = 0
 
     # ===== VIOLATION =====
-    should_create_violation = state.eye_closed_streak >= 6
+    should_create_violation = state.eye_closed_streak >= getattr(settings, "DROWSINESS_EYE_CLOSED_FRAMES", 6)
 
     return {
         "status": "EYE_CLOSED" if is_eye_closed else "EYE_OPEN",

@@ -76,7 +76,7 @@
 
             streakText.innerText = streak;
 
-            if (streak >= 6) {
+            if (streak >= DROWSINESS_EYE_CLOSED_FRAMES) {
               statusText.innerText = "NGỦ GỤC";
               statusText.style.color = "red";
             } else if (streak > 0) {

@@ -107,27 +107,15 @@ LOGOUT_REDIRECT_URL = 'login'
 
 # DROWSINESS SETTINGS
 DROWSINESS_MODEL_PATH = BASE_DIR / "ai" / "models" / "face_landmarker.task"
-DROWSINESS_FPS_ASSUMED = 5.0   # nếu ESP32 gửi 0.5s / ảnh
+DROWSINESS_FPS = 4  # tốc độ frame ESP32 gửi
 
-DROWSINESS_MODEL_PATH = BASE_DIR / "ai" / "models" / "face_landmarker.task"
-DROWSINESS_FPS_ASSUMED = 2.0
-DROWSINESS_STATE_TIMEOUT_SECONDS = 8
+DROWSINESS_EYE_CLOSED_RATIO = 0.75 # nhạy theo baseline cá nhân, ví dụ baseline EAR = 0.3 thì ngưỡng nhắm mắt sẽ là 0.3 * 0.85 = 0.255
+DROWSINESS_EYE_CLOSED_ABS = 0.20 # ngưỡng tuyệt đối fallback, nếu EAR < 0.20 thì cũng tính là nhắm mắt dù chưa calibrate được baseline
 
-DROWSINESS_LOW_LIGHT_THRESHOLD = 60
-DROWSINESS_HEAD_DROP_PITCH = 10.0
-DROWSINESS_EYE_CLOSED_RATIO = 0.75
-DROWSINESS_MAR_YAWN_RATIO = 1.5
+DROWSINESS_EYE_CLOSED_FRAMES = 8 # nhắm khoảng 8 frame liên tục thì trigger, tương đương 8 / DROWSINESS_FPS giây, ví dụ 8 / 4 = 2 giây nhắm mắt liên tục sẽ bị tính là vi phạm
+DROWSINESS_VIOLATION_COOLDOWN_SECONDS = 30 # thời gian chờ giữa các vi phạm của cùng 1 xe (theo license plate)
 
-DROWSINESS_CALIB_PITCH_STD_MAX = 5.0
-DROWSINESS_CALIB_EAR_STD_MAX = 0.04
-
-DROWSINESS_WARN_THRESHOLD = 35
-DROWSINESS_DANGER_THRESHOLD = 60
-DROWSINESS_WARN_THRESHOLD_HYST = 25
-DROWSINESS_DANGER_THRESHOLD_HYST = 50
-DROWSINESS_DANGER_THRESHOLD_UP_FROM_WARN = 65
-
-DROWSINESS_EYE_CLOSED_TRIGGER_FRAMES = 10
+DROWSINESS_CATEGORY_NAME = "Drowsiness"
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
