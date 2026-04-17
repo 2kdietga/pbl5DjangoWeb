@@ -32,8 +32,14 @@
 
       #statusBox {
         margin-top: 20px;
-        font-size: 22px;
+        font-size: 20px;
         font-weight: bold;
+        line-height: 1.8;
+      }
+
+      .label {
+        color: #bbb;
+        margin-right: 8px;
       }
     </style>
   </head>
@@ -48,20 +54,40 @@
 
     <img id="camera" src="/devices/{{ device.id }}/frame/" alt="Live camera" />
 
-    <!-- 🔥 STATUS -->
     <div id="statusBox">
-      <div>Status: <span id="status">...</span></div>
-      <div>Streak: <span id="streak">0</span></div>
+      <div><span class="label">Eye:</span><span id="eyeStatus">...</span></div>
+      <div>
+        <span class="label">Eye streak:</span><span id="eyeStreak">0</span>
+      </div>
+
+      <div>
+        <span class="label">Head:</span><span id="headStatus">...</span>
+      </div>
+      <div>
+        <span class="label">Head dir:</span
+        ><span id="headDirection">FORWARD</span>
+      </div>
+      <div>
+        <span class="label">Head score:</span><span id="headScore">0</span>
+      </div>
+      <div><span class="label">Yaw:</span><span id="headYaw">0</span></div>
     </div>
 
     <script>
       const img = document.getElementById("camera");
-      const statusText = document.getElementById("status");
-      const streakText = document.getElementById("streak");
+
+      const eyeStatusText = document.getElementById("eyeStatus");
+      const eyeStreakText = document.getElementById("eyeStreak");
+
+      const headStatusText = document.getElementById("headStatus");
+      const headDirectionText = document.getElementById("headDirection");
+      const headScoreText = document.getElementById("headScore");
+      const headYawText = document.getElementById("headYaw");
 
       const intervalMs = 500;
+      const eyeClosedFrames = 6; // đổi theo settings của bạn nếu cần
 
-      // ===== LOAD FRAME =====
+      // load frame
       setInterval(() => {
         img.src = "/devices/{{ device.id }}/frame/?t=" + new Date().getTime();
       }, intervalMs);
@@ -72,24 +98,53 @@
         })
           .then((res) => res.json())
           .then((data) => {
-            const streak = data.streak || 0;
+            // ===== EYE =====
+            const eyeStreak = data.eye_closed_streak || 0;
+            eyeStreakText.innerText = eyeStreak;
 
-            streakText.innerText = streak;
-
-            if (streak >= DROWSINESS_EYE_CLOSED_FRAMES) {
-              statusText.innerText = "NGỦ GỤC";
-              statusText.style.color = "red";
-            } else if (streak > 0) {
-              statusText.innerText = "ĐANG NHẮM MẮT";
-              statusText.style.color = "orange";
+            if (eyeStreak >= eyeClosedFrames) {
+              eyeStatusText.innerText = "NGỦ GỤC";
+              eyeStatusText.style.color = "red";
+            } else if (eyeStreak > 0) {
+              eyeStatusText.innerText = "ĐANG NHẮM MẮT";
+              eyeStatusText.style.color = "orange";
             } else {
-              statusText.innerText = "TỈNH TÁO";
-              statusText.style.color = "lime";
+              eyeStatusText.innerText = "TỈNH TÁO";
+              eyeStatusText.style.color = "lime";
             }
+
+            // ===== HEAD =====
+            const headStatus = data.head_status || "SAFE";
+            const headDirection = data.head_direction || "FORWARD";
+            const headScore = data.head_turn_score || 0;
+            const headYaw = data.head_yaw ?? 0;
+
+            headDirectionText.innerText = headDirection;
+            headScoreText.innerText = headScore;
+            headYawText.innerText = Number(headYaw).toFixed(1);
+
+            if (headStatus === "VIOLATION") {
+              headStatusText.innerText = "VI PHẠM";
+              headStatusText.style.color = "red";
+            } else if (headStatus === "TURNING") {
+              headStatusText.innerText = "ĐANG QUAY ĐẦU";
+              headStatusText.style.color = "orange";
+            } else {
+              headStatusText.innerText = "AN TOÀN";
+              headStatusText.style.color = "lime";
+            }
+          })
+          .catch(() => {
+            eyeStatusText.innerText = "ERROR";
+            eyeStatusText.style.color = "gray";
+
+            headStatusText.innerText = "ERROR";
+            headStatusText.style.color = "gray";
           });
       }
 
       setInterval(updateStatus, intervalMs);
+      updateStatus();
     </script>
   </body>
 </html>

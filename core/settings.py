@@ -111,11 +111,21 @@ DROWSINESS_FPS = 4  # tốc độ frame ESP32 gửi
 
 DROWSINESS_EYE_CLOSED_RATIO = 0.75 # nhạy theo baseline cá nhân, ví dụ baseline EAR = 0.3 thì ngưỡng nhắm mắt sẽ là 0.3 * 0.85 = 0.255
 DROWSINESS_EYE_CLOSED_ABS = 0.20 # ngưỡng tuyệt đối fallback, nếu EAR < 0.20 thì cũng tính là nhắm mắt dù chưa calibrate được baseline
+DROWSINESS_EYE_CLOSED_FRAMES = 2*DROWSINESS_FPS # nhắm khoảng 8 frame liên tục thì trigger, tương đương 8 / DROWSINESS_FPS giây, ví dụ 8 / 4 = 2 giây nhắm mắt liên tục sẽ bị tính là vi phạm
 
-DROWSINESS_EYE_CLOSED_FRAMES = 8 # nhắm khoảng 8 frame liên tục thì trigger, tương đương 8 / DROWSINESS_FPS giây, ví dụ 8 / 4 = 2 giây nhắm mắt liên tục sẽ bị tính là vi phạm
-DROWSINESS_VIOLATION_COOLDOWN_SECONDS = 30 # thời gian chờ giữa các vi phạm của cùng 1 xe (theo license plate)
 
 DROWSINESS_CATEGORY_NAME = "Drowsiness"
+DROWSINESS_VIOLATION_COOLDOWN_SECONDS = 30 # thời gian chờ giữa các vi phạm của cùng 1 xe (theo license plate)
+
+HEAD_TURN_CATEGORY_NAME = "Head Turn"
+HEAD_TURN_VIOLATION_COOLDOWN_SECONDS = 20
+
+DROWSINESS_HEAD_YAW_THRESHOLD = 25 # nếu head yaw > 25 độ thì cũng tính là vi phạm, tương đương quay đầu sang 1 bên quá nhiều
+DROWSINESS_HEAD_TURN_VIOLATION_FRAMES = 2*DROWSINESS_FPS # nếu quay đầu quá nhiều trong 8 frame liên tục thì cũng tính là vi phạm
+DROWSINESS_HEAD_TURN_DECAY = 1 # nếu head yaw > threshold thì tăng điểm quay đầu, nếu < threshold thì giảm điểm quay đầu theo decay, nếu điểm quay đầu > DROWSINESS_HEAD_TURN_VIOLATION_FRAMES thì tính là vi phạm
+
+
+DROWSINESS_BUFFER_SECONDS = 5 # số giây dữ liệu buffer cho mỗi thiết bị
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 

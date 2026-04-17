@@ -5,12 +5,10 @@ from django.conf import settings
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
 
 from accounts.models import Account
 from categories.models import Category
 from devices.services import save_latest_frame
-from vehicles.models import Vehicle
 from violations.models import Violation
 from devices.models import Device
 
@@ -22,20 +20,31 @@ class UploadAndDetectAPIView(APIView):
     permission_classes = []
 
     def post(self, request):
+        # ===== 1. IMAGE =====
         try:
             image = request.FILES.get("image")
         except Exception as e:
-            return Response({
-                "detail": "Upload interrupted",
-                "error": str(e)
-            }, status=400)
-        # ===== 1. DEVICE =====
+            return Response(
+                {
+                    "detail": "Upload interrupted",
+                    "error": str(e),
+                },
+                status=400,
+            )
+
+        if not image:
+            return Response({"detail": "Missing image"}, status=400)
+
+        # ===== 2. DEVICE =====
         token = request.headers.get("X-DEVICE-TOKEN")
         if not token:
             return Response({"detail": "Missing X-DEVICE-TOKEN"}, status=401)
 
-        device = Device.objects.filter(token=token, is_active=True)\
-            .select_related("vehicle").first()
+        device = (
+            Device.objects.filter(token=token, is_active=True)
+            .select_related("vehicle")
+            .first()
+        )
 
         if not device:
             return Response({"detail": "Invalid device token"}, status=401)
@@ -43,15 +52,21 @@ class UploadAndDetectAPIView(APIView):
         device.last_seen = timezone.now()
         device.save(update_fields=["last_seen"])
 
-        # ===== 2. IMAGE =====
-        # image = request.FILES.get("image")
-        # if not image:
-        #     return Response({"detail": "Missing image"}, status=400)
+        # ===== 3. SAVE LIVE FRAME =====
+        try:
+            image.seek(0)
+            save_latest_frame(device, image)
+            image.seek(0)
+        except Exception as e:
+            return Response(
+                {
+                    "detail": "Failed to save latest frame",
+                    "error": str(e),
+                },
+                status=500,
+            )
 
-        save_latest_frame(device, image)
-        image.seek(0)
-
-        # ===== 3. DRIVER =====
+        # ===== 4. DRIVER =====
         card_uid = (request.data.get("card_uid") or "").strip()
         if not card_uid:
             return Response({"detail": "Missing card_uid"}, status=400)
@@ -60,74 +75,146 @@ class UploadAndDetectAPIView(APIView):
         if not reporter:
             return Response({"detail": "Driver not found"}, status=404)
 
-        # ===== 4. VEHICLE =====
+        # ===== 5. VEHICLE =====
         vehicle = device.vehicle
         if vehicle is None:
             return Response({"detail": "Device has no vehicle"}, status=400)
 
-        # ===== 5. AI =====
+        # ===== 6. AI =====
         try:
+            image.seek(0)
             result = process_frame(image, device.token)
+            image.seek(0)
         except Exception as e:
             return Response({"detail": f"AI error: {str(e)}"}, status=500)
 
-        image.seek(0)
+        # ===== 7. READ RESULT =====
+        status_eye = result.get("status", "UNKNOWN")
+        should_create_eye_violation = result.get("should_create_violation", False)
+        eye_closed_streak = result.get("eye_closed_streak", 0)
+        ear = result.get("ear")
+        baseline_ear = result.get("baseline_ear")
+        is_calibrated = result.get("is_calibrated", False)
 
-        status_eye = result.get("status")
-        should_create_violation = result.get("should_create_violation", False)
-        streak = result.get("eye_closed_streak", 0)
+        head_yaw = result.get("head_yaw", 0.0)
+        head_direction = result.get("head_direction", "FORWARD")
+        head_turn_score = result.get("head_turn_score", 0)
+        head_status = result.get("head_status", "SAFE")
+        should_create_head_turn_violation = result.get(
+            "should_create_head_turn_violation", False
+        )
 
-        # ===== 6. CHƯA VI PHẠM =====
-        if not should_create_violation:
-            return Response({
-                "ok": True,
-                "status": status_eye,
-                "eye_closed_streak": streak,
-                "violation": False,
-                "vehicle": vehicle.license_plate,
-                "driver": reporter.username,
-            }, status=200)
+        should_create_any_violation = (
+            should_create_eye_violation or should_create_head_turn_violation
+        )
 
-        # ===== 7. VI PHẠM =====
-        category_name = "Drowsiness"
+        # ===== 8. NO VIOLATION =====
+        if not should_create_any_violation:
+            return Response(
+                {
+                    "ok": True,
+                    "eye_status": status_eye,
+                    "eye_closed_streak": eye_closed_streak,
+                    "ear": ear,
+                    "baseline_ear": baseline_ear,
+                    "is_calibrated": is_calibrated,
+                    "head_yaw": head_yaw,
+                    "head_direction": head_direction,
+                    "head_turn_score": head_turn_score,
+                    "head_status": head_status,
+                    "violation": False,
+                    "vehicle": vehicle.license_plate,
+                    "driver": reporter.username,
+                },
+                status=200,
+            )
+
+        # ===== 9. DECIDE TYPE =====
+        if should_create_eye_violation:
+            category_name = getattr(settings, "DROWSINESS_CATEGORY_NAME", "Drowsiness")
+            violation_title = "Drowsiness"
+            violation_description = (
+                f"Eye closed too long ({eye_closed_streak} frames) | "
+                f"EAR={ear} | baseline_EAR={baseline_ear}"
+            )
+            cooldown = int(
+                getattr(settings, "DROWSINESS_VIOLATION_COOLDOWN_SECONDS", 20)
+            )
+            violation_kind = "eye"
+        else:
+            category_name = getattr(settings, "HEAD_TURN_CATEGORY_NAME", "Head Turn")
+            violation_title = "Head Turn"
+            violation_description = (
+                f"Head turned too long ({head_turn_score} score) | "
+                f"yaw={head_yaw} | direction={head_direction}"
+            )
+            cooldown = int(
+                getattr(settings, "HEAD_TURN_VIOLATION_COOLDOWN_SECONDS", 20)
+            )
+            violation_kind = "head"
+
         category, _ = Category.objects.get_or_create(name=category_name)
 
-        cooldown = int(getattr(settings, "DROWSINESS_VIOLATION_COOLDOWN_SECONDS", 20))
+        # ===== 10. COOLDOWN =====
         now = timezone.now()
-
         recent = Violation.objects.filter(
             reporter=reporter,
             vehicle=vehicle,
             category=category,
-            reported_at__gte=now - timedelta(seconds=cooldown)
+            reported_at__gte=now - timedelta(seconds=cooldown),
         ).first()
 
         if recent:
-            return Response({
-                "ok": True,
-                "status": status_eye,
-                "violation": True,
-                "created": False,
-                "cooldown": True,
-                "eye_closed_streak": streak
-            }, status=200)
+            return Response(
+                {
+                    "ok": True,
+                    "eye_status": status_eye,
+                    "eye_closed_streak": eye_closed_streak,
+                    "ear": ear,
+                    "baseline_ear": baseline_ear,
+                    "is_calibrated": is_calibrated,
+                    "head_yaw": head_yaw,
+                    "head_direction": head_direction,
+                    "head_turn_score": head_turn_score,
+                    "head_status": head_status,
+                    "violation": True,
+                    "created": False,
+                    "cooldown": True,
+                    "cooldown_seconds": cooldown,
+                    "violation_id": recent.id,
+                    "violation_kind": violation_kind,
+                },
+                status=200,
+            )
 
-        # ===== 8. CREATE =====
+        # ===== 11. CREATE =====
         violation = Violation.objects.create(
             category=category,
             reporter=reporter,
             vehicle=vehicle,
-            title="Drowsiness",
-            description=f"Eye closed too long ({streak} frames)"
+            title=violation_title,
+            description=violation_description,
         )
 
+        image.seek(0)
         violation.image.save(image.name, image, save=True)
 
-        return Response({
-            "ok": True,
-            "status": status_eye,
-            "violation": True,
-            "created": True,
-            "violation_id": violation.id,
-            "eye_closed_streak": streak
-        }, status=201)
+        return Response(
+            {
+                "ok": True,
+                "eye_status": status_eye,
+                "eye_closed_streak": eye_closed_streak,
+                "ear": ear,
+                "baseline_ear": baseline_ear,
+                "is_calibrated": is_calibrated,
+                "head_yaw": head_yaw,
+                "head_direction": head_direction,
+                "head_turn_score": head_turn_score,
+                "head_status": head_status,
+                "violation": True,
+                "created": True,
+                "violation_id": violation.id,
+                "violation_kind": violation_kind,
+            },
+            status=201,
+        )

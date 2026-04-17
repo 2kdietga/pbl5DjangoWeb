@@ -40,3 +40,10 @@ def get_head_pitch(transformation_matrix):
 def get_brightness_bgr(frame_bgr):
     gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
     return float(np.mean(gray))
+
+
+def get_head_yaw(transformation_matrix):
+    rotation_matrix = transformation_matrix[:3, :3]
+    euler_angles, _, _, _, _, _ = cv2.RQDecomp3x3(rotation_matrix)
+    # thường index 1 là yaw
+    return float(euler_angles[1])
