@@ -1,0 +1,7 @@
+venv310
+__pycache__
+*.pyc
+.env
+.git
+staticfiles
+.gitignore
