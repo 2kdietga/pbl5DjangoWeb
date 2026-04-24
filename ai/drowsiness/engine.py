@@ -35,54 +35,47 @@ def process_frame(image_file, device_key):
     landmarker = get_landmarker()
     result = landmarker.detect(mp_image)
 
-    eye_closed_ratio = float(
-        getattr(settings, "DROWSINESS_EYE_CLOSED_RATIO", 0.85)
-    )
-    eye_closed_abs = float(
-        getattr(settings, "DROWSINESS_EYE_CLOSED_ABS", 0.20)
-    )
-    eye_closed_frames = int(
-        getattr(settings, "DROWSINESS_EYE_CLOSED_FRAMES", 6)
-    )
+    eye_closed_ratio = float(getattr(settings, "DROWSINESS_EYE_CLOSED_RATIO", 0.85))
+    eye_closed_abs = float(getattr(settings, "DROWSINESS_EYE_CLOSED_ABS", 0.20))
+    eye_closed_frames = int(getattr(settings, "DROWSINESS_EYE_CLOSED_FRAMES", 6))
 
-    head_yaw_threshold = float(
-        getattr(settings, "DROWSINESS_HEAD_YAW_THRESHOLD", 25)
-    )
+    head_yaw_threshold = float(getattr(settings, "DROWSINESS_HEAD_YAW_THRESHOLD", 25))
     head_turn_violation_frames = int(
         getattr(settings, "DROWSINESS_HEAD_TURN_VIOLATION_FRAMES", 15)
     )
-    head_turn_decay = int(
-        getattr(settings, "DROWSINESS_HEAD_TURN_DECAY", 1)
-    )
-    calib_frames = int(
-        getattr(settings, "DROWSINESS_CALIB_FRAMES", 10)
-    )
+    head_turn_decay = int(getattr(settings, "DROWSINESS_HEAD_TURN_DECAY", 1))
+    calib_frames = int(getattr(settings, "DROWSINESS_CALIB_FRAMES", 10))
 
-    # Không thấy mặt
+    # ===== Không thấy mặt =====
     if not result.face_landmarks or not result.facial_transformation_matrixes:
         state.eye_closed_streak = 0
         state.is_sleeping = False
+        state.drowsiness_frames.clear()
 
         state.head_turn_score = max(0, state.head_turn_score - head_turn_decay)
         if state.head_turn_score == 0:
             state.is_head_turning_violation = False
             state.head_direction = "FORWARD"
+            state.head_turn_frames.clear()
 
         state.last_yaw = 0.0
 
         return {
-            "status": "EYE_OPEN",
+            "status": "NO_FACE",
             "should_create_violation": False,
+            "should_create_head_turn_violation": False,
             "eye_closed_streak": 0,
             "ear": None,
             "baseline_ear": state.baseline_ear,
             "is_calibrated": state.is_calibrated,
-
             "head_yaw": 0.0,
             "head_direction": state.head_direction,
             "head_turn_score": state.head_turn_score,
             "head_status": "SAFE" if state.head_turn_score == 0 else "TURNING",
-            "should_create_head_turn_violation": False,
+            "drowsiness_frames_count": len(state.drowsiness_frames),
+            "head_turn_frames_count": len(state.head_turn_frames),
+            "drowsiness_video_frames": [],
+            "head_turn_video_frames": [],
         }
 
     landmarks = result.face_landmarks[0]
@@ -92,25 +85,39 @@ def process_frame(image_file, device_key):
     yaw = get_head_yaw(transformation_matrix)
     state.last_yaw = float(yaw)
 
+    head_turn_active = False
+
     if yaw > head_yaw_threshold:
         state.head_direction = "RIGHT"
         state.head_turn_score += 1
+        head_turn_active = True
     elif yaw < -head_yaw_threshold:
         state.head_direction = "LEFT"
         state.head_turn_score += 1
+        head_turn_active = True
     else:
         state.head_direction = "FORWARD"
         state.head_turn_score = max(0, state.head_turn_score - head_turn_decay)
+
+        if state.head_turn_score < head_turn_violation_frames:
+            state.head_turn_frames.clear()
+
         if state.head_turn_score == 0:
             state.is_head_turning_violation = False
 
+    if head_turn_active:
+        state.head_turn_frames.append(frame.copy())
+
     should_create_head_turn_violation = False
+    head_turn_video_frames = []
+
     if (
         state.head_turn_score >= head_turn_violation_frames
         and not state.is_head_turning_violation
     ):
         should_create_head_turn_violation = True
         state.is_head_turning_violation = True
+        head_turn_video_frames = list(state.head_turn_frames)
 
     if state.head_turn_score == 0:
         head_status = "SAFE"
@@ -135,16 +142,19 @@ def process_frame(image_file, device_key):
         return {
             "status": "CALIBRATING",
             "should_create_violation": False,
+            "should_create_head_turn_violation": should_create_head_turn_violation,
             "eye_closed_streak": state.eye_closed_streak,
             "ear": float(ear),
             "baseline_ear": state.baseline_ear,
             "is_calibrated": state.is_calibrated,
-
             "head_yaw": float(yaw),
             "head_direction": state.head_direction,
             "head_turn_score": state.head_turn_score,
             "head_status": head_status,
-            "should_create_head_turn_violation": should_create_head_turn_violation,
+            "drowsiness_frames_count": len(state.drowsiness_frames),
+            "head_turn_frames_count": len(state.head_turn_frames),
+            "drowsiness_video_frames": [],
+            "head_turn_video_frames": head_turn_video_frames,
         }
 
     # ===== EYE DETECT =====
@@ -155,26 +165,36 @@ def process_frame(image_file, device_key):
 
     if is_eye_closed:
         state.eye_closed_streak += 1
+        state.drowsiness_frames.append(frame.copy())
     else:
+        if state.eye_closed_streak < eye_closed_frames:
+            state.drowsiness_frames.clear()
+
         state.eye_closed_streak = 0
         state.is_sleeping = False
 
     should_create_violation = False
+    drowsiness_video_frames = []
+
     if state.eye_closed_streak >= eye_closed_frames and not state.is_sleeping:
         should_create_violation = True
         state.is_sleeping = True
+        drowsiness_video_frames = list(state.drowsiness_frames)
 
     return {
         "status": "EYE_CLOSED" if is_eye_closed else "EYE_OPEN",
         "should_create_violation": should_create_violation,
+        "should_create_head_turn_violation": should_create_head_turn_violation,
         "eye_closed_streak": state.eye_closed_streak,
         "ear": float(ear),
         "baseline_ear": state.baseline_ear,
         "is_calibrated": state.is_calibrated,
-
         "head_yaw": float(yaw),
         "head_direction": state.head_direction,
         "head_turn_score": state.head_turn_score,
         "head_status": head_status,
-        "should_create_head_turn_violation": should_create_head_turn_violation,
+        "drowsiness_frames_count": len(state.drowsiness_frames),
+        "head_turn_frames_count": len(state.head_turn_frames),
+        "drowsiness_video_frames": drowsiness_video_frames,
+        "head_turn_video_frames": head_turn_video_frames,
     }

@@ -4,3 +4,4 @@
 
 
 # templates/accounts/account_verification_email.html
+templates/violation_details.html

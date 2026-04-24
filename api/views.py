@@ -13,6 +13,7 @@ from violations.models import Violation
 from devices.models import Device
 
 from ai.drowsiness.engine import process_frame
+from ai.drowsiness.video_utils import export_frames_to_mp4
 
 
 class UploadAndDetectAPIView(APIView):
@@ -104,6 +105,9 @@ class UploadAndDetectAPIView(APIView):
             "should_create_head_turn_violation", False
         )
 
+        drowsiness_video_frames = result.get("drowsiness_video_frames", [])
+        head_turn_video_frames = result.get("head_turn_video_frames", [])
+
         should_create_any_violation = (
             should_create_eye_violation or should_create_head_turn_violation
         )
@@ -141,6 +145,7 @@ class UploadAndDetectAPIView(APIView):
                 getattr(settings, "DROWSINESS_VIOLATION_COOLDOWN_SECONDS", 20)
             )
             violation_kind = "eye"
+            video_frames = drowsiness_video_frames
         else:
             category_name = getattr(settings, "HEAD_TURN_CATEGORY_NAME", "Head Turn")
             violation_title = "Head Turn"
@@ -152,6 +157,7 @@ class UploadAndDetectAPIView(APIView):
                 getattr(settings, "HEAD_TURN_VIOLATION_COOLDOWN_SECONDS", 20)
             )
             violation_kind = "head"
+            video_frames = head_turn_video_frames
 
         category, _ = Category.objects.get_or_create(name=category_name)
 
@@ -187,15 +193,31 @@ class UploadAndDetectAPIView(APIView):
                 status=200,
             )
 
-        # ===== 11. CREATE =====
+        # ===== 11. EXPORT VIDEO =====
+        video_rel_path = None
+        try:
+            fps = int(getattr(settings, "DROWSINESS_FPS", 5))
+            video_rel_path = export_frames_to_mp4(video_frames, fps=fps)
+        except Exception as e:
+            return Response(
+                {
+                    "detail": "Failed to export violation video",
+                    "error": str(e),
+                },
+                status=500,
+            )
+
+        # ===== 12. CREATE =====
         violation = Violation.objects.create(
             category=category,
             reporter=reporter,
             vehicle=vehicle,
             title=violation_title,
             description=violation_description,
+            video=video_rel_path,   # nếu model đã có field video
         )
 
+        # giữ ảnh tĩnh làm thumbnail / fallback
         image.seek(0)
         violation.image.save(image.name, image, save=True)
 
@@ -215,6 +237,7 @@ class UploadAndDetectAPIView(APIView):
                 "created": True,
                 "violation_id": violation.id,
                 "violation_kind": violation_kind,
+                "has_video": bool(video_rel_path),
             },
             status=201,
         )

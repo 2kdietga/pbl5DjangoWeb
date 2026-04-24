@@ -1,5 +1,4 @@
 {% extends "base.html" %} {% load static %} {% block content %}
-
 <nav class="navbar navbar-light bg-white border-bottom">
   <div class="container d-flex justify-content-between align-items-center">
     <a class="btn btn-link text-dark p-0" href="javascript:history.back()">
@@ -17,19 +16,26 @@
         <div class="card-header bg-white">
           <strong>Bằng chứng</strong>
         </div>
+
         <div class="card-body">
-          {% if violation.image %}
-          <img
-            src="{{ violation.image.url }}"
-            class="img-fluid rounded border mb-3"
-            alt="Bằng chứng"
-          />
-          {% endif %} {% if violation.video %}
-          <video class="w-100 rounded border" controls>
-            <source src="{{ violation.video.url }}" />
+          {% if violation.video %}
+          <video
+            class="w-100 rounded border"
+            controls
+            preload="metadata"
+            playsinline
+          >
+            <source src="{{ violation.video.url }}" type="video/mp4" />
             Trình duyệt của bạn không hỗ trợ video.
           </video>
-          {% endif %} {% if not violation.image and not violation.video %}
+          {% elif violation.image %}
+          <img
+            src="{{ violation.image.url }}"
+            class="img-fluid rounded border"
+            alt="Bằng chứng"
+            loading="lazy"
+          />
+          {% else %}
           <div class="text-center text-muted py-5 border rounded">
             Chưa có hình ảnh hoặc video bằng chứng
           </div>
@@ -64,7 +70,7 @@
           <div class="mb-2 d-flex">
             <div class="text-muted" style="width: 160px">Tài xế</div>
             <div class="font-weight-bold">
-              {{ violation.reporter.get_full_name }}
+              {{violation.reporter.get_full_name|default:violation.reporter.username}}
             </div>
           </div>
 
@@ -122,7 +128,6 @@
             </div>
           </div>
 
-          <!-- Appeal section -->
           <div class="mt-4">
             <h5 class="mb-3">Kháng cáo</h5>
 
@@ -185,7 +190,6 @@
             {% endif %}
           </div>
 
-          <!-- Actions -->
           <div class="mt-4 d-flex justify-content-end">
             <a
               class="btn btn-outline-secondary"
@@ -199,5 +203,4 @@
     </div>
   </div>
 </div>
-
 {% endblock %}
