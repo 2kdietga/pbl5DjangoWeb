@@ -14,7 +14,7 @@ Muc tieu cua du an la tao mot pipeline khap kin gom:
 - thiet bi gui anh ve server theo token xac thuc;
 - server xu ly AI theo thoi gian gan real-time;
 - vi pham duoc tao tu dong va gan voi tai xe, phuong tien, loai vi pham;
-- tai xe dang nhap web de xem danh sach, chi tiet va anh minh chung;
+- tai xe dang nhap web de xem danh sach, chi tiet va anh/video bang chung;
 - he thong luu frame moi nhat cua tung thiet bi de phuc vu man hinh theo doi truc tiep.
 
 ## 3. Cong nghe su dung
@@ -24,6 +24,7 @@ Muc tieu cua du an la tao mot pipeline khap kin gom:
 - Xu ly thi giac may tinh: `OpenCV`, `MediaPipe`
 - Machine Learning / Deep Learning: `PyTorch`, `torchvision`
 - Trien khai: `Gunicorn`, `WhiteNoise`, `Docker`
+- Video evidence: `ffmpeg` de convert MP4 sang dinh dang web-compatible
 - Frontend server-rendered: Django Templates, Bootstrap, static assets
 
 ## 4. Kien truc tong quan
@@ -34,7 +35,7 @@ He thong duoc chia thanh cac app Django chinh:
 - `vehicles`: quan ly phuong tien thong qua bien so, model, ngay dang ky.
 - `devices`: quan ly thiet bi gui anh len server, token thiet bi, frame moi nhat va trang thai theo doi.
 - `categories`: dinh nghia nhom vi pham.
-- `violations`: luu bien ban vi pham, mo ta, anh/video, thoi diem ghi nhan va trang thai da xem.
+- `violations`: luu bien ban vi pham, mo ta, anh/video, thoi diem ghi nhan, trang thai da xem va luong khang cao.
 - `api`: cung cap API de thiet bi upload anh va kich hoat xu ly AI.
 - `ai`: chua logic xu ly AI, dac biet la bai toan phat hien buon ngu va quay dau.
 - `core`: cau hinh chung, routing, settings va entrypoint cua du an.
@@ -82,8 +83,18 @@ Thong tin luu kem gom:
 - tieu de va mo ta vi pham;
 - thoi gian bao cao;
 - anh bang chung;
-- video bang chung (truong da duoc chuan bi trong model);
-- co `viewed` de danh dau da xem tren giao dien.
+- video bang chung duoc export tu cac frame AI da buffer;
+- co `viewed` de danh dau da xem tren giao dien;
+- co `status` de theo doi trang thai xu ly: `pending`, `confirmed`, `dismissed`, `appealed`.
+
+### 5.6. Khang cao vi pham (`violations.ViolationAppeal`)
+
+Moi vi pham co the co mot don khang cao tu tai xe. Don khang cao luu:
+- vi pham lien quan;
+- tai xe gui khang cao;
+- ly do khang cao;
+- trang thai xu ly: `pending`, `approved`, `rejected`;
+- ghi chu cua quan tri vien va thoi diem duyet.
 
 ## 6. Luong xu ly nghiep vu chinh
 
@@ -101,7 +112,8 @@ Khi thiet bi gui du lieu, server xu ly theo cac buoc:
 7. Goi `ai.drowsiness.engine.process_frame()` de phan tich anh.
 8. Neu chua co vi pham, tra ve trang thai AI hien tai.
 9. Neu co vi pham, tao hoac tai su dung `Category`, kiem tra cooldown de tranh ghi lap.
-10. Tao ban ghi `Violation` va luu anh vi pham vao media.
+10. Xuat cac frame bang chung thanh video MP4 neu co frame trong buffer.
+11. Tao ban ghi `Violation`, luu video bang chung va luu anh hien tai lam thumbnail/fallback.
 
 ### 6.2. Luong theo doi truc tiep
 
@@ -116,7 +128,10 @@ Nguoi dung co the:
 - cap nhat profile;
 - xem danh sach vi pham cua chinh minh;
 - loc theo ngay va loai vi pham;
-- xem chi tiet tung bien ban va danh dau da xem.
+- xem chi tiet tung bien ban va danh dau da xem;
+- gui khang cao cho vi pham neu cho rang ket qua chua hop ly.
+
+Quan tri vien co the xem danh sach don khang cao, duyet chap nhan hoac tu choi. Khi chap nhan khang cao, vi pham duoc chuyen sang `dismissed`; khi tu choi, vi pham duoc chuyen sang `confirmed`.
 
 ## 7. Logic AI dang duoc ap dung
 
@@ -144,6 +159,7 @@ Tu ma tran bien doi khuon mat cua MediaPipe, he thong tinh `yaw` cua dau:
 Trang thai AI duoc luu tam trong bo nho qua `STATE_STORE`, key theo `device token`. Moi thiet bi co mot `EyeState` rieng de nho:
 - baseline EAR;
 - chuoi frame nham mat;
+- buffer frame de tao video bang chung;
 - diem quay dau;
 - huong dau;
 - goc yaw gan nhat.
@@ -159,6 +175,7 @@ Trong `core/settings.py`, he thong da khai bao nhieu tham so nghiep vu:
 - `DROWSINESS_EYE_CLOSED_FRAMES`: so frame nham mat lien tiep de ket luan vi pham;
 - `DROWSINESS_HEAD_YAW_THRESHOLD`: nguong goc quay dau;
 - `DROWSINESS_HEAD_TURN_VIOLATION_FRAMES`: so frame/diem de ket luan quay dau nguy hiem;
+- `DROWSINESS_BUFFER_SECONDS`: so giay frame duoc giu trong RAM de dung video bang chung;
 - `DROWSINESS_VIOLATION_COOLDOWN_SECONDS` va `HEAD_TURN_VIOLATION_COOLDOWN_SECONDS`: thoi gian chong lap vi pham.
 
 Day la cac tham so quan trong de hieu rang he thong khong chi phan loai anh don le, ma con theo doi theo chuoi thoi gian ngan.
@@ -168,16 +185,21 @@ Day la cac tham so quan trong de hieu rang he thong khong chi phan loai anh don 
 Cac route muc tieu dang duoc cau hinh nhu sau:
 - `/`: trang dang nhap mac dinh.
 - `/accounts/login/`, `/accounts/register/`, `/accounts/logout/`, `/accounts/profile/`
-- `/violations/`: danh sach vi pham.
+- `/violations/list/`: danh sach vi pham.
+- `/violations/detail/<id>/`: chi tiet vi pham, hien thi video neu co, fallback sang anh neu khong co video.
+- `/violations/<id>/appeal/`: gui khang cao cho vi pham.
+- `/violations/admin/appeals/`: danh sach khang cao danh cho tai khoan staff.
 - `/devices/<id>/live/`: giao dien xem realtime.
 - `/api/upload/`: API nhan frame tu thiet bi.
 - `/admin/`: trang quan tri Django.
 
-Template dang co gom `login`, `register`, `profile`, `violation_list`, `violation_detail`, `live_view`, `base`.
+Template dang co gom `login`, `register`, `profile`, `violation_list`, `violation_detail`, `admin_appeal_list`, `admin_appeal_detail`, `live_view`, `base`.
 
 ## 10. Trien khai va van hanh
 
 Du an co san `Dockerfile` de dong goi va chay bang `gunicorn`. Cac thu vien he thong duoc cai them chu yeu phuc vu OpenCV/MediaPipe nhu `libglib2.0-0`, `libgl1`, `libgomp1`, `libgles2`, `libegl1`.
+
+Luu y: tinh nang video bang chung goi lenh `ffmpeg` de convert file MP4 sang H.264 + `yuv420p`. Moi truong chay production/Docker can cai `ffmpeg`; neu khong co, code se fallback sang file MP4 tam do OpenCV ghi, nhung kha nang phat tren trinh duyet co the kem on dinh hon.
 
 Cau hinh hien tai:
 - cong khai dich vu o cong `10000`;
@@ -194,6 +216,8 @@ python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
+
+Neu muon dung video bang chung o local, may chay can cai san `ffmpeg` va co trong `PATH`.
 
 Truy cap:
 - web app: `http://127.0.0.1:8000/`
@@ -214,13 +238,16 @@ docker run -p 10000:10000 core-app
 - Da co luong nghiep vu tu thiet bi den web app kha day du.
 - Da ket hop thong tin tai xe, phuong tien, thiet bi va vi pham trong cung mot he thong.
 - Co san co che cooldown tranh spam vi pham.
+- Da tao video bang chung tu chuoi frame khi phat hien vi pham.
 - Co live view de quan sat frame va trang thai realtime.
+- Co luong khang cao va duyet khang cao cho vi pham.
 
 ### Han che
 
 - Co so du lieu dang dung `SQLite`, phu hop cho hoc tap/demo hon la tai lon.
 - `STATE_STORE` luu trong RAM nen se mat khi restart va khong phu hop khi scale nhieu worker.
 - Bao mat dang o muc demo: `DEBUG=True`, `ALLOWED_HOSTS=['*']`.
+- Dockerfile hien tai chua cai `ffmpeg`, trong khi tinh nang video bang chung phu thuoc vao lenh nay de tao MP4 web-compatible.
 - Chua thay bo test nghiep vu duoc xay dung day du.
 - Mot so file AI cu van con duoc giu lai o dang comment, cho thay he thong dang trong qua trinh thu nghiem/mo rong.
 
