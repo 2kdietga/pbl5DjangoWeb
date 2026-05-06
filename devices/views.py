@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, render
 from django.conf import settings
 
 from ai.drowsiness.state import STATE_STORE
+from ai.phone.state import PHONE_STATE_STORE
 from .models import Device
 
 
@@ -27,6 +28,7 @@ def device_live_view(request, id):
     # AJAX: trả JSON trạng thái realtime
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         state = STATE_STORE.get(device.token)
+        phone_state = PHONE_STATE_STORE.get(device.token)
 
         head_turn_threshold = int(
             getattr(settings, "DROWSINESS_HEAD_TURN_VIOLATION_FRAMES", 15)
@@ -39,6 +41,11 @@ def device_live_view(request, id):
                 "head_turn_score": 0,
                 "head_yaw": 0.0,
                 "head_status": "SAFE",
+                "phone_status": getattr(phone_state, "last_status", "UNKNOWN"),
+                "phone_label": getattr(phone_state, "last_label", "UNKNOWN"),
+                "phone_confidence": getattr(phone_state, "last_confidence", 0.0),
+                "phone_probability": getattr(phone_state, "last_phone_probability", 0.0),
+                "phone_frames_collected": len(getattr(phone_state, "frames", [])) if phone_state else 0,
             })
 
         head_turn_score = getattr(state, "head_turn_score", 0)
@@ -58,6 +65,11 @@ def device_live_view(request, id):
             "head_turn_score": head_turn_score,
             "head_yaw": head_yaw,
             "head_status": head_status,
+            "phone_status": getattr(phone_state, "last_status", "UNKNOWN"),
+            "phone_label": getattr(phone_state, "last_label", "UNKNOWN"),
+            "phone_confidence": getattr(phone_state, "last_confidence", 0.0),
+            "phone_probability": getattr(phone_state, "last_phone_probability", 0.0),
+            "phone_frames_collected": len(getattr(phone_state, "frames", [])) if phone_state else 0,
         })
 
     # Render HTML

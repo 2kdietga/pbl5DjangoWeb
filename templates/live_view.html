@@ -71,6 +71,13 @@
         <span class="label">Head score:</span><span id="headScore">0</span>
       </div>
       <div><span class="label">Yaw:</span><span id="headYaw">0</span></div>
+      <div><span class="label">Phone:</span><span id="phoneStatus">...</span></div>
+      <div>
+        <span class="label">Phone prob:</span><span id="phoneProbability">0</span>
+      </div>
+      <div>
+        <span class="label">Phone frames:</span><span id="phoneFrames">0</span>
+      </div>
     </div>
 
     <script>
@@ -83,6 +90,9 @@
       const headDirectionText = document.getElementById("headDirection");
       const headScoreText = document.getElementById("headScore");
       const headYawText = document.getElementById("headYaw");
+      const phoneStatusText = document.getElementById("phoneStatus");
+      const phoneProbabilityText = document.getElementById("phoneProbability");
+      const phoneFramesText = document.getElementById("phoneFrames");
 
       const intervalMs = 500;
       const eyeClosedFrames = 6; // đổi theo settings của bạn nếu cần
@@ -133,6 +143,23 @@
               headStatusText.innerText = "AN TOÀN";
               headStatusText.style.color = "lime";
             }
+
+            // ===== PHONE =====
+            const phoneStatus = data.phone_status || "UNKNOWN";
+            const phoneProbability = data.phone_probability ?? 0;
+            const phoneFrames = data.phone_frames_collected || 0;
+
+            phoneStatusText.innerText = phoneStatus;
+            phoneProbabilityText.innerText = Number(phoneProbability).toFixed(3);
+            phoneFramesText.innerText = phoneFrames;
+
+            if (phoneStatus === "PHONE") {
+              phoneStatusText.style.color = "red";
+            } else if (phoneStatus === "SAFE") {
+              phoneStatusText.style.color = "lime";
+            } else {
+              phoneStatusText.style.color = "gray";
+            }
           })
           .catch(() => {
             eyeStatusText.innerText = "ERROR";
@@ -140,6 +167,9 @@
 
             headStatusText.innerText = "ERROR";
             headStatusText.style.color = "gray";
+
+            phoneStatusText.innerText = "ERROR";
+            phoneStatusText.style.color = "gray";
           });
       }
 

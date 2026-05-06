@@ -1,256 +1,435 @@
-﻿# Core - He thong giam sat vi pham tai xe bang AI
+# Core - Driver Violation Monitoring System
 
-## 1. Gioi thieu
+Du an Django nay xay dung he thong giam sat hanh vi tai xe tu camera/thiet bi gan tren xe. Thiet bi upload frame anh ve server, server xac thuc bang device token, xac dinh tai xe bang `card_uid`, chay AI de phat hien vi pham va tao bang chung cho tai xe xem lai tren giao dien web.
 
-Day la du an Django xay dung he thong giam sat hanh vi tai xe tu thiet bi gan tren xe. He thong nhan anh tu camera/thiet bi, xu ly AI de phat hien cac tinh huong mat an toan, luu bien ban vi pham va cung cap giao dien web de tai xe xem lai lich su vi pham cua minh.
+He thong hien ho tro 3 nhom vi pham:
 
-Theo hien trang ma nguon, he thong dang tap trung vao 2 nhom vi pham chinh:
-- `Drowsiness`: tai xe buon ngu, nham mat qua nguong cho phep.
-- `Head Turn`: tai xe quay dau qua muc trong mot khoang thoi gian lien tiep.
+- `Drowsiness`: tai xe nham mat/buon ngu qua nguong.
+- `Head Turn`: tai xe quay dau trai/phai qua nguong trong mot khoang thoi gian.
+- `Phone`: tai xe co dau hieu su dung dien thoai, duoc phat hien bang model video classification CNN + GRU.
 
-## 2. Muc tieu he thong
+## Tech Stack
 
-Muc tieu cua du an la tao mot pipeline khap kin gom:
-- thiet bi gui anh ve server theo token xac thuc;
-- server xu ly AI theo thoi gian gan real-time;
-- vi pham duoc tao tu dong va gan voi tai xe, phuong tien, loai vi pham;
-- tai xe dang nhap web de xem danh sach, chi tiet va anh/video bang chung;
-- he thong luu frame moi nhat cua tung thiet bi de phuc vu man hinh theo doi truc tiep.
+- Backend: `Django 5.0.14`, `Django REST Framework`
+- Database: `SQLite3`
+- AI / Computer Vision: `MediaPipe`, `OpenCV`, `PyTorch`, `NumPy`, `Pillow`
+- Frontend: Django Templates, Bootstrap, jQuery
+- Static serving: `WhiteNoise`
+- Production server: `Gunicorn`
+- Container: `Docker`
+- Video evidence: `OpenCV VideoWriter`, co the convert sang H.264 MP4 bang `ffmpeg`
 
-## 3. Cong nghe su dung
+## Project Structure
 
-- Backend: `Django 5`, `Django REST Framework`
-- Co so du lieu: `SQLite3`
-- Xu ly thi giac may tinh: `OpenCV`, `MediaPipe`
-- Machine Learning / Deep Learning: `PyTorch`, `torchvision`
-- Trien khai: `Gunicorn`, `WhiteNoise`, `Docker`
-- Video evidence: `ffmpeg` de convert MP4 sang dinh dang web-compatible
-- Frontend server-rendered: Django Templates, Bootstrap, static assets
+```text
+core/
+  accounts/        Custom user, auth, profile, card_uid
+  ai/
+    drowsiness/    MediaPipe EAR/yaw detection
+    phone/         CNN + GRU phone usage detection
+    models/        AI model files
+  api/             Upload frame API
+  categories/      Violation categories
+  core/            Django settings, urls, wsgi/asgi
+  devices/         Device management, latest frame, live view
+  media/           Runtime uploads: frames, images, videos
+  static/          Static files
+  templates/       HTML templates
+  vehicles/        Vehicle model
+  violations/      Violations and appeal workflow
+  manage.py
+  requirements.txt
+  Dockerfile
+```
 
-## 4. Kien truc tong quan
+## Domain Model
 
-He thong duoc chia thanh cac app Django chinh:
+### Account
 
-- `accounts`: quan ly tai khoan dang nhap, thong tin ca nhan, anh dai dien, lien ket `card_uid` cua RFID.
-- `vehicles`: quan ly phuong tien thong qua bien so, model, ngay dang ky.
-- `devices`: quan ly thiet bi gui anh len server, token thiet bi, frame moi nhat va trang thai theo doi.
-- `categories`: dinh nghia nhom vi pham.
-- `violations`: luu bien ban vi pham, mo ta, anh/video, thoi diem ghi nhan, trang thai da xem va luong khang cao.
-- `api`: cung cap API de thiet bi upload anh va kich hoat xu ly AI.
-- `ai`: chua logic xu ly AI, dac biet la bai toan phat hien buon ngu va quay dau.
-- `core`: cau hinh chung, routing, settings va entrypoint cua du an.
+`accounts.Account` la custom user model, dang nhap bang `email`.
 
-## 5. Mo hinh du lieu chinh
+Thong tin quan trong:
 
-### 5.1. Tai khoan (`accounts.Account`)
+- `email`, `username`, `first_name`, `last_name`, `phone_number`
+- `card_uid`: UID the RFID de map frame upload voi tai xe
+- `is_admin`, `is_staff`, `is_active`, `is_superadmin`
+- `UserImage`: luu anh nguoi dung, co the danh dau avatar
 
-Tai khoan nguoi dung duoc custom tu `AbstractBaseUser`, dang nhap bang email. Ngoai cac truong thong tin co ban, model con co:
-- `card_uid`: ma the RFID dung de xac dinh tai xe khi thiet bi gui du lieu;
-- cac co quan tri nhu `is_admin`, `is_staff`, `is_superadmin`;
-- lien ket 1-n voi `UserImage` de luu anh dai dien.
+### Vehicle
 
-### 5.2. Phuong tien (`vehicles.Vehicle`)
+`vehicles.Vehicle` luu thong tin xe:
 
-Moi xe duoc quan ly boi:
-- bien so xe;
-- model xe;
-- ngay dang ky.
+- `license_plate`
+- `model`
+- `registration_date`
 
-### 5.3. Thiet bi (`devices.Device`)
+### Device
 
-Moi thiet bi duoc gan voi mot xe va co:
-- `token` duy nhat de xac thuc khi goi API;
-- `vehicle` de biet thiet bi dang nam tren xe nao;
-- `last_seen` de theo doi lan gui du lieu gan nhat;
-- `latest_frame`, `latest_frame_at` de hien thi anh gan nhat tren giao dien live view.
+`devices.Device` dai dien cho camera/thiet bi gan tren xe:
 
-### 5.4. Danh muc vi pham (`categories.Category`)
+- `name`
+- `token`: token unique, gui trong header `X-DEVICE-TOKEN`
+- `vehicle`: xe dang gan voi thiet bi
+- `is_active`
+- `last_seen`
+- `latest_frame`, `latest_frame_at`
 
-Dung de phan loai vi pham, gom:
-- ten loai vi pham;
-- mo ta;
-- muc do nghiem trong (`severality_level`);
-- trang thai kich hoat.
+### Category
 
-### 5.5. Vi pham (`violations.Violation`)
+`categories.Category` dinh nghia loai vi pham:
 
-La bang trung tam cua he thong, lien ket toi:
-- `category`: loai vi pham;
-- `reporter`: tai xe bi ghi nhan;
-- `vehicle`: phuong tien lien quan.
+- `name`
+- `description`
+- `severality_level`
+- `is_active`
+- `created_at`
 
-Thong tin luu kem gom:
-- tieu de va mo ta vi pham;
-- thoi gian bao cao;
-- anh bang chung;
-- video bang chung duoc export tu cac frame AI da buffer;
-- co `viewed` de danh dau da xem tren giao dien;
-- co `status` de theo doi trang thai xu ly: `pending`, `confirmed`, `dismissed`, `appealed`.
+### Violation
 
-### 5.6. Khang cao vi pham (`violations.ViolationAppeal`)
+`violations.Violation` la ban ghi vi pham:
 
-Moi vi pham co the co mot don khang cao tu tai xe. Don khang cao luu:
-- vi pham lien quan;
-- tai xe gui khang cao;
-- ly do khang cao;
-- trang thai xu ly: `pending`, `approved`, `rejected`;
-- ghi chu cua quan tri vien va thoi diem duyet.
+- `category`
+- `reporter`: tai xe bi ghi nhan
+- `vehicle`
+- `title`, `description`
+- `reported_at`
+- `image`: anh bang chung/thumbnail
+- `video`: video bang chung
+- `viewed`
+- `status`: `pending`, `confirmed`, `dismissed`, `appealed`
 
-## 6. Luong xu ly nghiep vu chinh
+### ViolationAppeal
 
-### 6.1. Luong upload va phat hien vi pham
+`violations.ViolationAppeal` cho phep tai xe khang cao:
 
-API chinh cua he thong la `POST /api/upload/`.
+- moi vi pham chi co mot appeal
+- `reason`
+- `status`: `pending`, `approved`, `rejected`
+- `admin_note`
+- `created_at`, `reviewed_at`
 
-Khi thiet bi gui du lieu, server xu ly theo cac buoc:
-1. Nhan file anh tu request.
-2. Kiem tra header `X-DEVICE-TOKEN` de xac thuc thiet bi.
-3. Tim `Device` dang hoat dong va cap nhat `last_seen`.
-4. Luu frame moi nhat cua thiet bi de phuc vu man hinh live.
-5. Nhan `card_uid` de xac dinh tai xe.
-6. Lay xe dang gan voi thiet bi.
-7. Goi `ai.drowsiness.engine.process_frame()` de phan tich anh.
-8. Neu chua co vi pham, tra ve trang thai AI hien tai.
-9. Neu co vi pham, tao hoac tai su dung `Category`, kiem tra cooldown de tranh ghi lap.
-10. Xuat cac frame bang chung thanh video MP4 neu co frame trong buffer.
-11. Tao ban ghi `Violation`, luu video bang chung va luu anh hien tai lam thumbnail/fallback.
+Khi staff chap nhan appeal, violation duoc chuyen sang `dismissed`. Khi tu choi, violation duoc chuyen sang `confirmed`.
 
-### 6.2. Luong theo doi truc tiep
+## AI Pipeline
 
-App `devices` ho tro 2 route quan trong:
-- `GET /devices/<id>/frame/`: tra ve frame moi nhat cua thiet bi.
-- `GET /devices/<id>/live/`: hien thi trang theo doi thiet bi; neu goi AJAX thi tra ve JSON trang thai realtime nhu muc nham mat, huong quay dau, diem quay dau, goc yaw.
+He thong co 2 pipeline AI chay song song tren moi frame upload.
 
-### 6.3. Luong web cho nguoi dung
+### Drowsiness va Head Turn
 
-Nguoi dung co the:
-- dang ky, dang nhap, dang xuat;
-- cap nhat profile;
-- xem danh sach vi pham cua chinh minh;
-- loc theo ngay va loai vi pham;
-- xem chi tiet tung bien ban va danh dau da xem;
-- gui khang cao cho vi pham neu cho rang ket qua chua hop ly.
+Module: `ai/drowsiness/`
 
-Quan tri vien co the xem danh sach don khang cao, duyet chap nhan hoac tu choi. Khi chap nhan khang cao, vi pham duoc chuyen sang `dismissed`; khi tu choi, vi pham duoc chuyen sang `confirmed`.
+Thanh phan chinh:
 
-## 7. Logic AI dang duoc ap dung
+- `engine.py`: doc anh, chay MediaPipe Face Landmarker, tinh EAR va yaw
+- `metrics.py`: tinh EAR, MAR, pitch, yaw, brightness
+- `state.py`: luu state theo device token
+- `mediapipe_loader.py`: lazy-load `face_landmarker.task`
+- `video_utils.py`: export frame buffer thanh MP4
 
-Phan AI hien tai trong ma nguon tap trung vao bai toan theo doi trang thai mat va huong dau.
+Co che:
 
-### 7.1. Phat hien buon ngu
+- MediaPipe lay landmark khuon mat va transformation matrix.
+- EAR duoc tinh tu moc mat trai/phai.
+- He thong calibrate `baseline_ear` ban dau theo tung device.
+- Mat duoc coi la nham khi EAR thap hon nguong theo baseline hoac nguong tuyet doi.
+- Neu so frame nham mat lien tiep vuot `DROWSINESS_EYE_CLOSED_FRAMES`, tao vi pham `Drowsiness`.
+- Yaw dau duoc tinh tu transformation matrix.
+- Neu yaw vuot `DROWSINESS_HEAD_YAW_THRESHOLD`, `head_turn_score` tang.
+- Neu score vuot `DROWSINESS_HEAD_TURN_VIOLATION_FRAMES`, tao vi pham `Head Turn`.
 
-Module `ai/drowsiness/engine.py` su dung `MediaPipe Face Landmarker` de trich xuat moc khuon mat va tinh `EAR` (Eye Aspect Ratio).
+### Phone Usage
 
-Co che xu ly:
-- he thong can mot pha `calibration` ban dau de tinh `baseline_ear` theo tung thiet bi/doi tuong;
-- EAR hien tai duoc lam muot bang ham `smooth()`;
-- neu EAR thap hon nguong ti le theo baseline hoac thap hon nguong tuyet doi, he thong coi nhu mat dang nham;
-- neu so frame nham mat lien tiep vuot nguong cau hinh, he thong tao vi pham `Drowsiness`.
+Module: `ai/phone/`
 
-### 7.2. Phat hien quay dau
+Model: `ai/models/model_ep26_val0.9268.pth`
 
-Tu ma tran bien doi khuon mat cua MediaPipe, he thong tinh `yaw` cua dau:
-- neu `yaw` vuot nguong trai/phai, diem `head_turn_score` tang dan;
-- neu quay ve trung tam, diem nay giam theo `decay`;
-- khi diem vuot nguong cau hinh va chua tung bao vi pham trong dot hien tai, he thong tao vi pham `Head Turn`.
+Kien truc:
 
-### 7.3. Trang thai theo thiet bi
+- `LightCNN`: 5 block `Conv2D + BatchNorm + ReLU + Pool`, tao vector dac trung 256 chieu cho moi frame
+- `GRU`: 2 lop, hidden size 64, hoc quan he theo chuoi frame
+- Classifier: `BatchNorm1d -> Linear(64, 32) -> ReLU -> Dropout -> Linear(32, 2)`
+- Output: logits `[batch_size, 2]`, tuong ung `Safe` va `Phone`
 
-Trang thai AI duoc luu tam trong bo nho qua `STATE_STORE`, key theo `device token`. Moi thiet bi co mot `EyeState` rieng de nho:
-- baseline EAR;
-- chuoi frame nham mat;
-- buffer frame de tao video bang chung;
-- diem quay dau;
-- huong dau;
-- goc yaw gan nhat.
+Input runtime:
 
-Cach lam nay phu hop cho demo va prototype realtime, nhung ve kien truc van la trang thai trong RAM, chua phai co che phan tan hoac persistent state.
+- Moi device co buffer 12 frame gan nhat trong RAM.
+- Moi frame duoc resize ve `112x112`.
+- Frame duoc normalize theo ImageNet mean/std.
+- Khi du 12 frame, model nhan tensor `[1, 12, 3, 112, 112]`.
+- Neu label la `Phone` va `phone_probability >= PHONE_CONFIDENCE_THRESHOLD`, API tao vi pham `Phone`.
+- Chuoi 12 frame tai thoi diem trigger duoc export thanh video bang chung.
 
-## 8. Cac cau hinh AI quan trong
+## Runtime State
 
-Trong `core/settings.py`, he thong da khai bao nhieu tham so nghiep vu:
-- `DROWSINESS_FPS`: toc do frame gui len;
-- `DROWSINESS_EYE_CLOSED_RATIO`: nguong nham mat theo baseline ca nhan;
-- `DROWSINESS_EYE_CLOSED_ABS`: nguong tuyet doi fallback;
-- `DROWSINESS_EYE_CLOSED_FRAMES`: so frame nham mat lien tiep de ket luan vi pham;
-- `DROWSINESS_HEAD_YAW_THRESHOLD`: nguong goc quay dau;
-- `DROWSINESS_HEAD_TURN_VIOLATION_FRAMES`: so frame/diem de ket luan quay dau nguy hiem;
-- `DROWSINESS_BUFFER_SECONDS`: so giay frame duoc giu trong RAM de dung video bang chung;
-- `DROWSINESS_VIOLATION_COOLDOWN_SECONDS` va `HEAD_TURN_VIOLATION_COOLDOWN_SECONDS`: thoi gian chong lap vi pham.
+State AI hien dang luu trong RAM:
 
-Day la cac tham so quan trong de hieu rang he thong khong chi phan loai anh don le, ma con theo doi theo chuoi thoi gian ngan.
+- `STATE_STORE`: state cho drowsiness/head-turn
+- `PHONE_STATE_STORE`: state cho phone detection
 
-## 9. Giao dien va routing
+Dieu nay phu hop demo/prototype va mot worker. Khi restart server, state se mat. Neu scale nhieu worker/server, can dua state sang Redis hoac mot storage chia se.
 
-Cac route muc tieu dang duoc cau hinh nhu sau:
-- `/`: trang dang nhap mac dinh.
-- `/accounts/login/`, `/accounts/register/`, `/accounts/logout/`, `/accounts/profile/`
-- `/violations/list/`: danh sach vi pham.
-- `/violations/detail/<id>/`: chi tiet vi pham, hien thi video neu co, fallback sang anh neu khong co video.
-- `/violations/<id>/appeal/`: gui khang cao cho vi pham.
-- `/violations/admin/appeals/`: danh sach khang cao danh cho tai khoan staff.
-- `/devices/<id>/live/`: giao dien xem realtime.
-- `/api/upload/`: API nhan frame tu thiet bi.
-- `/admin/`: trang quan tri Django.
+Dockerfile hien tai chay Gunicorn voi `--workers 1`, phu hop voi cach luu state trong RAM.
 
-Template dang co gom `login`, `register`, `profile`, `violation_list`, `violation_detail`, `admin_appeal_list`, `admin_appeal_detail`, `live_view`, `base`.
+## Main Flow
 
-## 10. Trien khai va van hanh
+Endpoint chinh:
 
-Du an co san `Dockerfile` de dong goi va chay bang `gunicorn`. Cac thu vien he thong duoc cai them chu yeu phuc vu OpenCV/MediaPipe nhu `libglib2.0-0`, `libgl1`, `libgomp1`, `libgles2`, `libegl1`.
+```text
+POST /api/upload/
+```
 
-Luu y: tinh nang video bang chung goi lenh `ffmpeg` de convert file MP4 sang H.264 + `yuv420p`. Moi truong chay production/Docker can cai `ffmpeg`; neu khong co, code se fallback sang file MP4 tam do OpenCV ghi, nhung kha nang phat tren trinh duyet co the kem on dinh hon.
+Luong xu ly:
 
-Cau hinh hien tai:
-- cong khai dich vu o cong `10000`;
-- dung `WhiteNoise` de phuc vu static files;
-- `collectstatic` duoc chay ngay trong qua trinh build image.
+1. Thiet bi gui `image`, `card_uid`, va header `X-DEVICE-TOKEN`.
+2. API kiem tra token va lay `Device`.
+3. Cap nhat `last_seen`.
+4. Luu frame moi nhat vao `device.latest_frame`.
+5. Tim tai xe bang `card_uid`.
+6. Lay xe dang gan voi device.
+7. Chay `ai.drowsiness.engine.process_frame()`.
+8. Chay `ai.phone.engine.process_frame()`.
+9. Neu khong co vi pham, tra JSON realtime.
+10. Neu co vi pham, chon loai theo uu tien `Drowsiness -> Head Turn -> Phone`.
+11. Kiem tra cooldown theo `reporter + vehicle + category`.
+12. Export video bang chung neu co frame buffer.
+13. Tao `Violation`, luu `image` fallback va `video` neu co.
 
-## 11. Huong dan chay du an
+## API Upload
 
-### 11.1. Chay local
+Request:
 
 ```bash
+curl -X POST http://127.0.0.1:8000/api/upload/ \
+  -H "X-DEVICE-TOKEN: <device-token>" \
+  -F "card_uid=<driver-card-uid>" \
+  -F "image=@frame.jpg"
+```
+
+Response khi khong tao vi pham:
+
+```json
+{
+  "ok": true,
+  "eye_status": "EYE_OPEN",
+  "eye_closed_streak": 0,
+  "ear": 0.31,
+  "baseline_ear": 0.32,
+  "is_calibrated": true,
+  "head_yaw": 0.0,
+  "head_direction": "FORWARD",
+  "head_turn_score": 0,
+  "head_status": "SAFE",
+  "phone_status": "SAFE",
+  "phone_label": "Safe",
+  "phone_confidence": 0.91,
+  "phone_probability": 0.09,
+  "phone_frames_collected": 12,
+  "phone_sequence_length": 12,
+  "violation": false,
+  "vehicle": "ABC-123",
+  "driver": "driver_username"
+}
+```
+
+Response khi tao vi pham:
+
+```json
+{
+  "ok": true,
+  "violation": true,
+  "created": true,
+  "violation_id": 1,
+  "violation_kind": "phone",
+  "has_video": true
+}
+```
+
+Gia tri `violation_kind` co the la:
+
+- `eye`
+- `head`
+- `phone`
+
+Loi thuong gap:
+
+- `400 Missing image`
+- `401 Missing X-DEVICE-TOKEN`
+- `401 Invalid device token`
+- `400 Missing card_uid`
+- `404 Driver not found`
+- `400 Device has no vehicle`
+- `500 AI error: ...`
+- `500 Phone AI error: ...`
+- `500 Failed to export violation video`
+
+## Web Routes
+
+```text
+/                                  Login page
+/admin/                            Django admin
+/accounts/register/                Register
+/accounts/login/                   Login
+/accounts/logout/                  Logout
+/accounts/profile/                 Profile
+/violations/list/                  Driver violation list
+/violations/detail/<violation_id>/ Violation detail
+/violations/<violation_id>/appeal/ Create appeal
+/violations/admin/appeals/         Staff appeal list
+/violations/admin/appeals/<id>/    Staff appeal detail
+/violations/admin/appeals/<id>/review/ Approve/reject appeal
+/devices/<id>/live/                Live camera and AI status
+/devices/<id>/frame/               Latest device frame
+/api/upload/                       Device upload API
+```
+
+## Settings
+
+Quan trong trong `core/settings.py`:
+
+```python
+AUTH_USER_MODEL = "accounts.Account"
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "violation_list"
+LOGOUT_REDIRECT_URL = "login"
+
+DROWSINESS_MODEL_PATH = BASE_DIR / "ai" / "models" / "face_landmarker.task"
+DROWSINESS_FPS = 4
+DROWSINESS_EYE_CLOSED_RATIO = 0.75
+DROWSINESS_EYE_CLOSED_ABS = 0.20
+DROWSINESS_EYE_CLOSED_FRAMES = 2 * DROWSINESS_FPS
+DROWSINESS_CATEGORY_NAME = "Drowsiness"
+DROWSINESS_VIOLATION_COOLDOWN_SECONDS = 30
+
+HEAD_TURN_CATEGORY_NAME = "Head Turn"
+HEAD_TURN_VIOLATION_COOLDOWN_SECONDS = 20
+DROWSINESS_HEAD_YAW_THRESHOLD = 25
+DROWSINESS_HEAD_TURN_VIOLATION_FRAMES = 2 * DROWSINESS_FPS
+DROWSINESS_HEAD_TURN_DECAY = 1
+DROWSINESS_BUFFER_SECONDS = 5
+
+PHONE_MODEL_PATH = BASE_DIR / "ai" / "models" / "model_ep26_val0.9268.pth"
+PHONE_CATEGORY_NAME = "Phone"
+PHONE_VIOLATION_COOLDOWN_SECONDS = 30
+PHONE_SEQUENCE_LENGTH = 12
+PHONE_IMAGE_SIZE = 112
+PHONE_CONFIDENCE_THRESHOLD = 0.7
+PHONE_CLASS_LABELS = ["Safe", "Phone"]
+```
+
+Database/static/media:
+
+```python
+DATABASES["default"]["ENGINE"] = "django.db.backends.sqlite3"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "static"
+STATICFILES_DIRS = ["core/static"]
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+TIME_ZONE = "Asia/Ho_Chi_Minh"
+```
+
+## Run Locally
+
+Yeu cau:
+
+- Python 3.10
+- Virtualenv
+- `ffmpeg` neu muon video evidence phat on dinh tren browser
+
+Chay local:
+
+```bash
+python -m venv venv310
+venv310\Scripts\activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Neu muon dung video bang chung o local, may chay can cai san `ffmpeg` va co trong `PATH`.
-
 Truy cap:
-- web app: `http://127.0.0.1:8000/`
-- admin: `http://127.0.0.1:8000/admin/`
 
-### 11.2. Chay bang Docker
+```text
+Web:   http://127.0.0.1:8000/
+Admin: http://127.0.0.1:8000/admin/
+```
+
+## Demo Data
+
+Can tao toi thieu:
+
+1. `Account` co `card_uid`.
+2. `Vehicle`.
+3. `Device` active, co `token`, gan voi `Vehicle`.
+4. Category co the tao san hoac de API tu tao: `Drowsiness`, `Head Turn`, `Phone`.
+
+Sau do upload frame bang curl hoac client thiet bi:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/upload/ \
+  -H "X-DEVICE-TOKEN: <device-token>" \
+  -F "card_uid=<driver-card-uid>" \
+  -F "image=@frame.jpg"
+```
+
+## Docker
+
+Build:
 
 ```bash
 docker build -t core-app .
+```
+
+Run:
+
+```bash
 docker run -p 10000:10000 core-app
 ```
 
-## 12. Danh gia hien trang du an
+Truy cap:
 
-### Diem manh
+```text
+http://127.0.0.1:10000/
+```
 
-- Kien truc Django tach app ro rang theo domain.
-- Da co luong nghiep vu tu thiet bi den web app kha day du.
-- Da ket hop thong tin tai xe, phuong tien, thiet bi va vi pham trong cung mot he thong.
-- Co san co che cooldown tranh spam vi pham.
-- Da tao video bang chung tu chuoi frame khi phat hien vi pham.
-- Co live view de quan sat frame va trang thai realtime.
-- Co luong khang cao va duyet khang cao cho vi pham.
+Dockerfile hien tai:
 
-### Han che
+- Dung `python:3.10-slim`.
+- Cai thu vien he thong cho OpenCV/MediaPipe.
+- Cai dependencies tu `requirements.txt`.
+- Chay `collectstatic`.
+- Chay Gunicorn tai port `10000`.
+- Dung `--workers 1`.
 
-- Co so du lieu dang dung `SQLite`, phu hop cho hoc tap/demo hon la tai lon.
-- `STATE_STORE` luu trong RAM nen se mat khi restart va khong phu hop khi scale nhieu worker.
-- Bao mat dang o muc demo: `DEBUG=True`, `ALLOWED_HOSTS=['*']`.
-- Dockerfile hien tai chua cai `ffmpeg`, trong khi tinh nang video bang chung phu thuoc vao lenh nay de tao MP4 web-compatible.
-- Chua thay bo test nghiep vu duoc xay dung day du.
-- Mot so file AI cu van con duoc giu lai o dang comment, cho thay he thong dang trong qua trinh thu nghiem/mo rong.
+Luu y: Dockerfile hien chua cai `ffmpeg`. Neu can video H.264 web-compatible, nen them `ffmpeg` vao apt packages.
 
-## 13. Ket luan
+## Runtime Files
 
-`core` la mot du an web AI theo huong ung dung thuc te trong giam sat an toan tai xe. Gia tri chinh cua he thong nam o cho no ket noi duoc 4 lop thanh mot quy trinh thong nhat: thiet bi nhung, xu ly AI, backend quan ly va giao dien tra cuu vi pham. Neu tiep tuc phat trien, huong mo rong hop ly nhat la nang cap ha tang luu state realtime, bo sung test, cai thien bao mat va toi uu trien khai production.
+Cac file/thu muc runtime:
+
+- `db.sqlite3`: database local
+- `media/live/`: frame moi nhat cua device
+- `media/violations/`: anh bang chung
+- `media/violations/videos/`: video bang chung
+- `static/`: collected static/static root
+
+## Production Notes
+
+Cau hinh hien tai phu hop demo/prototype hon production:
+
+- `DEBUG=True`
+- `ALLOWED_HOSTS=["*"]`
+- `SECRET_KEY` hard-code
+- SQLite
+- API upload chi xac thuc bang `X-DEVICE-TOKEN`
+- AI state nam trong RAM
+
+Huong nang cap:
+
+- Dua secret va config ra environment variables.
+- Dung PostgreSQL/MySQL thay SQLite.
+- Dung Redis cho realtime AI state neu scale multi-worker.
+- Them rate limit va logging cho `/api/upload/`.
+- Cai `ffmpeg` trong Docker image.
+- Bo sung test cho upload API, cooldown, appeal workflow va AI inference wrapper.
+

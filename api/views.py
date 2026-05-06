@@ -13,6 +13,7 @@ from violations.models import Violation
 from devices.models import Device
 
 from ai.drowsiness.engine import process_frame
+from ai.phone.engine import process_frame as process_phone_frame
 from ai.drowsiness.video_utils import export_frames_to_mp4
 
 
@@ -89,6 +90,13 @@ class UploadAndDetectAPIView(APIView):
         except Exception as e:
             return Response({"detail": f"AI error: {str(e)}"}, status=500)
 
+        try:
+            image.seek(0)
+            phone_result = process_phone_frame(image, device.token)
+            image.seek(0)
+        except Exception as e:
+            return Response({"detail": f"Phone AI error: {str(e)}"}, status=500)
+
         # ===== 7. READ RESULT =====
         status_eye = result.get("status", "UNKNOWN")
         should_create_eye_violation = result.get("should_create_violation", False)
@@ -108,8 +116,20 @@ class UploadAndDetectAPIView(APIView):
         drowsiness_video_frames = result.get("drowsiness_video_frames", [])
         head_turn_video_frames = result.get("head_turn_video_frames", [])
 
+        phone_status = phone_result.get("status", "UNKNOWN")
+        phone_label = phone_result.get("label", "UNKNOWN")
+        phone_confidence = phone_result.get("confidence", 0.0)
+        phone_probability = phone_result.get("phone_probability", 0.0)
+        phone_frames_collected = phone_result.get("frames_collected", 0)
+        phone_sequence_length = phone_result.get("sequence_length", 12)
+        should_create_phone_violation = phone_result.get(
+            "should_create_violation", False
+        )
+        phone_video_frames = phone_result.get("video_frames", [])
+
         should_create_any_violation = (
             should_create_eye_violation or should_create_head_turn_violation
+            or should_create_phone_violation
         )
 
         # ===== 8. NO VIOLATION =====
@@ -126,6 +146,12 @@ class UploadAndDetectAPIView(APIView):
                     "head_direction": head_direction,
                     "head_turn_score": head_turn_score,
                     "head_status": head_status,
+                    "phone_status": phone_status,
+                    "phone_label": phone_label,
+                    "phone_confidence": phone_confidence,
+                    "phone_probability": phone_probability,
+                    "phone_frames_collected": phone_frames_collected,
+                    "phone_sequence_length": phone_sequence_length,
                     "violation": False,
                     "vehicle": vehicle.license_plate,
                     "driver": reporter.username,
@@ -146,7 +172,7 @@ class UploadAndDetectAPIView(APIView):
             )
             violation_kind = "eye"
             video_frames = drowsiness_video_frames
-        else:
+        elif should_create_head_turn_violation:
             category_name = getattr(settings, "HEAD_TURN_CATEGORY_NAME", "Head Turn")
             violation_title = "Head Turn"
             violation_description = (
@@ -158,6 +184,19 @@ class UploadAndDetectAPIView(APIView):
             )
             violation_kind = "head"
             video_frames = head_turn_video_frames
+        else:
+            category_name = getattr(settings, "PHONE_CATEGORY_NAME", "Phone")
+            violation_title = "Phone Usage"
+            violation_description = (
+                f"Phone usage detected | "
+                f"label={phone_label} | confidence={phone_confidence:.4f} | "
+                f"phone_probability={phone_probability:.4f}"
+            )
+            cooldown = int(
+                getattr(settings, "PHONE_VIOLATION_COOLDOWN_SECONDS", 30)
+            )
+            violation_kind = "phone"
+            video_frames = phone_video_frames
 
         category, _ = Category.objects.get_or_create(name=category_name)
 
@@ -183,6 +222,12 @@ class UploadAndDetectAPIView(APIView):
                     "head_direction": head_direction,
                     "head_turn_score": head_turn_score,
                     "head_status": head_status,
+                    "phone_status": phone_status,
+                    "phone_label": phone_label,
+                    "phone_confidence": phone_confidence,
+                    "phone_probability": phone_probability,
+                    "phone_frames_collected": phone_frames_collected,
+                    "phone_sequence_length": phone_sequence_length,
                     "violation": True,
                     "created": False,
                     "cooldown": True,
@@ -233,6 +278,12 @@ class UploadAndDetectAPIView(APIView):
                 "head_direction": head_direction,
                 "head_turn_score": head_turn_score,
                 "head_status": head_status,
+                "phone_status": phone_status,
+                "phone_label": phone_label,
+                "phone_confidence": phone_confidence,
+                "phone_probability": phone_probability,
+                "phone_frames_collected": phone_frames_collected,
+                "phone_sequence_length": phone_sequence_length,
                 "violation": True,
                 "created": True,
                 "violation_id": violation.id,

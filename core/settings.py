@@ -109,6 +109,17 @@ DROWSINESS_HEAD_TURN_DECAY = 1 # nếu head yaw > threshold thì tăng điểm q
 
 
 DROWSINESS_BUFFER_SECONDS = 5 # số giây dữ liệu buffer cho mỗi thiết bị
+
+
+# PHONE USAGE VIDEO CLASSIFICATION SETTINGS
+PHONE_MODEL_PATH = BASE_DIR / "ai" / "models" / "model_ep26_val0.9268.pth"
+PHONE_CATEGORY_NAME = "Phone"
+PHONE_VIOLATION_COOLDOWN_SECONDS = 30
+PHONE_SEQUENCE_LENGTH = 12
+PHONE_IMAGE_SIZE = 112
+PHONE_CONFIDENCE_THRESHOLD = 0.7
+PHONE_CLASS_LABELS = ["Safe", "Phone"]
+
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
