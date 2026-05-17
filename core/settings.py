@@ -89,7 +89,12 @@ LOGOUT_REDIRECT_URL = 'login'
 
 
 # DROWSINESS SETTINGS
-DROWSINESS_MODEL_PATH = BASE_DIR / "ai" / "models" / "face_landmarker.task"
+DROWSINESS_LANDMARK98_MODEL_PATH = BASE_DIR / "ai" / "models" / "landmark_98_best.pth"
+DROWSINESS_LANDMARK98_DEVICE = "auto"
+DROWSINESS_FACE_CROP_MARGIN = 0.25
+DROWSINESS_FACE_MIN_SIZE = 40
+DROWSINESS_FACE_SCALE_FACTOR = 1.1
+DROWSINESS_FACE_MIN_NEIGHBORS = 5
 DROWSINESS_FPS = 4  # tốc độ frame ESP32 gửi
 
 DROWSINESS_EYE_CLOSED_RATIO = 0.75 # nhạy theo baseline cá nhân, ví dụ baseline EAR = 0.3 thì ngưỡng nhắm mắt sẽ là 0.3 * 0.85 = 0.255

@@ -1,23 +1,23 @@
-# Core - Driver Violation Monitoring System
+# Driver Violation Monitoring System
 
-Du an Django nay xay dung he thong giam sat hanh vi tai xe tu camera/thiet bi gan tren xe. Thiet bi upload frame anh ve server, server xac thuc bang device token, xac dinh tai xe bang `card_uid`, chay AI de phat hien vi pham va tao bang chung cho tai xe xem lai tren giao dien web.
+Dự án Django này xây dựng hệ thống giám sát hành vi tài xế từ camera hoặc thiết bị gắn trên xe. Thiết bị gửi frame ảnh về server, server xác thực bằng device token, định danh tài xế bằng `card_uid`, chạy các pipeline AI để phát hiện vi phạm và lưu bằng chứng cho tài xế xem lại trên giao diện web.
 
-He thong hien ho tro 3 nhom vi pham:
+Hệ thống hiện hỗ trợ 3 nhóm vi phạm:
 
-- `Drowsiness`: tai xe nham mat/buon ngu qua nguong.
-- `Head Turn`: tai xe quay dau trai/phai qua nguong trong mot khoang thoi gian.
-- `Phone`: tai xe co dau hieu su dung dien thoai, duoc phat hien bang model video classification CNN + GRU.
+- `Drowsiness`: tài xế nhắm mắt hoặc buồn ngủ quá ngưỡng.
+- `Head Turn`: tài xế quay đầu trái/phải quá lâu.
+- `Phone`: tài xế có dấu hiệu sử dụng điện thoại.
 
 ## Tech Stack
 
 - Backend: `Django 5.0.14`, `Django REST Framework`
 - Database: `SQLite3`
-- AI / Computer Vision: `MediaPipe`, `OpenCV`, `PyTorch`, `NumPy`, `Pillow`
+- AI / Computer Vision: `OpenCV`, `PyTorch`, `TorchVision`, `NumPy`, `Pillow`
 - Frontend: Django Templates, Bootstrap, jQuery
 - Static serving: `WhiteNoise`
 - Production server: `Gunicorn`
 - Container: `Docker`
-- Video evidence: `OpenCV VideoWriter`, co the convert sang H.264 MP4 bang `ffmpeg`
+- Video evidence: `OpenCV VideoWriter`
 
 ## Project Structure
 
@@ -25,9 +25,9 @@ He thong hien ho tro 3 nhom vi pham:
 core/
   accounts/        Custom user, auth, profile, card_uid
   ai/
-    drowsiness/    MediaPipe EAR/yaw detection
+    drowsiness/    Landmark-98 EAR/yaw detection
     phone/         CNN + GRU phone usage detection
-    models/        AI model files
+    models/        AI model weights
   api/             Upload frame API
   categories/      Violation categories
   core/            Django settings, urls, wsgi/asgi
@@ -42,161 +42,51 @@ core/
   Dockerfile
 ```
 
-## Domain Model
-
-### Account
-
-`accounts.Account` la custom user model, dang nhap bang `email`.
-
-Thong tin quan trong:
-
-- `email`, `username`, `first_name`, `last_name`, `phone_number`
-- `card_uid`: UID the RFID de map frame upload voi tai xe
-- `is_admin`, `is_staff`, `is_active`, `is_superadmin`
-- `UserImage`: luu anh nguoi dung, co the danh dau avatar
-
-### Vehicle
-
-`vehicles.Vehicle` luu thong tin xe:
-
-- `license_plate`
-- `model`
-- `registration_date`
-
-### Device
-
-`devices.Device` dai dien cho camera/thiet bi gan tren xe:
-
-- `name`
-- `token`: token unique, gui trong header `X-DEVICE-TOKEN`
-- `vehicle`: xe dang gan voi thiet bi
-- `is_active`
-- `last_seen`
-- `latest_frame`, `latest_frame_at`
-
-### Category
-
-`categories.Category` dinh nghia loai vi pham:
-
-- `name`
-- `description`
-- `severality_level`
-- `is_active`
-- `created_at`
-
-### Violation
-
-`violations.Violation` la ban ghi vi pham:
-
-- `category`
-- `reporter`: tai xe bi ghi nhan
-- `vehicle`
-- `title`, `description`
-- `reported_at`
-- `image`: anh bang chung/thumbnail
-- `video`: video bang chung
-- `viewed`
-- `status`: `pending`, `confirmed`, `dismissed`, `appealed`
-
-### ViolationAppeal
-
-`violations.ViolationAppeal` cho phep tai xe khang cao:
-
-- moi vi pham chi co mot appeal
-- `reason`
-- `status`: `pending`, `approved`, `rejected`
-- `admin_note`
-- `created_at`, `reviewed_at`
-
-Khi staff chap nhan appeal, violation duoc chuyen sang `dismissed`. Khi tu choi, violation duoc chuyen sang `confirmed`.
-
-## AI Pipeline
-
-He thong co 2 pipeline AI chay song song tren moi frame upload.
-
-### Drowsiness va Head Turn
-
-Module: `ai/drowsiness/`
-
-Thanh phan chinh:
-
-- `engine.py`: doc anh, chay MediaPipe Face Landmarker, tinh EAR va yaw
-- `metrics.py`: tinh EAR, MAR, pitch, yaw, brightness
-- `state.py`: luu state theo device token
-- `mediapipe_loader.py`: lazy-load `face_landmarker.task`
-- `video_utils.py`: export frame buffer thanh MP4
-
-Co che:
-
-- MediaPipe lay landmark khuon mat va transformation matrix.
-- EAR duoc tinh tu moc mat trai/phai.
-- He thong calibrate `baseline_ear` ban dau theo tung device.
-- Mat duoc coi la nham khi EAR thap hon nguong theo baseline hoac nguong tuyet doi.
-- Neu so frame nham mat lien tiep vuot `DROWSINESS_EYE_CLOSED_FRAMES`, tao vi pham `Drowsiness`.
-- Yaw dau duoc tinh tu transformation matrix.
-- Neu yaw vuot `DROWSINESS_HEAD_YAW_THRESHOLD`, `head_turn_score` tang.
-- Neu score vuot `DROWSINESS_HEAD_TURN_VIOLATION_FRAMES`, tao vi pham `Head Turn`.
-
-### Phone Usage
-
-Module: `ai/phone/`
-
-Model: `ai/models/model_ep26_val0.9268.pth`
-
-Kien truc:
-
-- `LightCNN`: 5 block `Conv2D + BatchNorm + ReLU + Pool`, tao vector dac trung 256 chieu cho moi frame
-- `GRU`: 2 lop, hidden size 64, hoc quan he theo chuoi frame
-- Classifier: `BatchNorm1d -> Linear(64, 32) -> ReLU -> Dropout -> Linear(32, 2)`
-- Output: logits `[batch_size, 2]`, tuong ung `Safe` va `Phone`
-
-Input runtime:
-
-- Moi device co buffer 12 frame gan nhat trong RAM.
-- Moi frame duoc resize ve `112x112`.
-- Frame duoc normalize theo ImageNet mean/std.
-- Khi du 12 frame, model nhan tensor `[1, 12, 3, 112, 112]`.
-- Neu label la `Phone` va `phone_probability >= PHONE_CONFIDENCE_THRESHOLD`, API tao vi pham `Phone`.
-- Chuoi 12 frame tai thoi diem trigger duoc export thanh video bang chung.
-
-## Runtime State
-
-State AI hien dang luu trong RAM:
-
-- `STATE_STORE`: state cho drowsiness/head-turn
-- `PHONE_STATE_STORE`: state cho phone detection
-
-Dieu nay phu hop demo/prototype va mot worker. Khi restart server, state se mat. Neu scale nhieu worker/server, can dua state sang Redis hoac mot storage chia se.
-
-Dockerfile hien tai chay Gunicorn voi `--workers 1`, phu hop voi cach luu state trong RAM.
-
 ## Main Flow
 
-Endpoint chinh:
+Endpoint chính:
 
 ```text
 POST /api/upload/
 ```
 
-Luong xu ly:
+Luồng xử lý:
 
-1. Thiet bi gui `image`, `card_uid`, va header `X-DEVICE-TOKEN`.
-2. API kiem tra token va lay `Device`.
-3. Cap nhat `last_seen`.
-4. Luu frame moi nhat vao `device.latest_frame`.
-5. Tim tai xe bang `card_uid`.
-6. Lay xe dang gan voi device.
-7. Chay `ai.drowsiness.engine.process_frame()`.
-8. Chay `ai.phone.engine.process_frame()`.
-9. Neu khong co vi pham, tra JSON realtime.
-10. Neu co vi pham, chon loai theo uu tien `Drowsiness -> Head Turn -> Phone`.
-11. Kiem tra cooldown theo `reporter + vehicle + category`.
-12. Export video bang chung neu co frame buffer.
-13. Tao `Violation`, luu `image` fallback va `video` neu co.
+1. Thiết bị gửi `image`, `card_uid` và header `X-DEVICE-TOKEN`.
+2. API xác thực `Device` bằng token.
+3. Server cập nhật `last_seen` và lưu frame mới nhất vào `device.latest_frame`.
+4. Server tìm tài xế bằng `card_uid`.
+5. Server lấy xe đang gắn với device.
+6. Chạy AI drowsiness/head-turn bằng `ai.drowsiness.engine.process_frame()`.
+7. Chạy AI phone usage bằng `ai.phone.engine.process_frame()`.
+8. Nếu không có vi phạm, API trả JSON realtime.
+9. Nếu có vi phạm, API chọn loại ưu tiên: `Drowsiness -> Head Turn -> Phone`.
+10. Kiểm tra cooldown theo `reporter + vehicle + category`.
+11. Export video bằng chứng từ frame buffer nếu có.
+12. Tạo bản ghi `Violation`, lưu ảnh thumbnail/fallback và video bằng chứng.
 
-## API Upload
+## AI Pipeline
 
-Request:
+Hệ thống có 2 pipeline AI chạy trên mỗi frame upload:
+
+- Drowsiness + Head Turn: dùng model landmark 98 điểm.
+- Phone Usage: dùng model video classification CNN + GRU.
+
+State AI hiện lưu trong RAM theo `device_key`. Cách này phù hợp demo/prototype và cấu hình `Gunicorn --workers 1`. Nếu scale nhiều worker/server, cần chuyển state sang Redis hoặc storage dùng chung.
+
+## AI Input/Output
+
+### Upload API Input
+
+API nhận request dạng `multipart/form-data`.
+
+| Thành phần | Tên | Kiểu | Bắt buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| Header | `X-DEVICE-TOKEN` | string | Có | Token của thiết bị camera |
+| Form field | `card_uid` | string | Có | UID thẻ RFID để định danh tài xế |
+| Form file | `image` | image file | Có | Frame ảnh hiện tại từ camera |
+
+Ví dụ:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/upload/ \
@@ -205,7 +95,133 @@ curl -X POST http://127.0.0.1:8000/api/upload/ \
   -F "image=@frame.jpg"
 ```
 
-Response khi khong tao vi pham:
+### Landmark-98 Model
+
+File weights:
+
+```text
+ai/models/landmark_98_best.pth
+```
+
+Module liên quan:
+
+- `ai/drowsiness/landmark98_loader.py`: load model, detect/crop mặt, tiền xử lý ảnh, suy luận heatmap.
+- `ai/drowsiness/metrics.py`: tính EAR và yaw từ 98 landmark.
+- `ai/drowsiness/engine.py`: quản lý state, calibration, streak, trigger vi phạm.
+
+Input runtime của loader:
+
+| Bước | Input | Shape/kiểu | Ghi chú |
+| --- | --- | --- | --- |
+| API frame | `image_file` | file ảnh | Đọc bằng Pillow, convert sang BGR |
+| Face detect | `frame_bgr` | `H x W x 3` | OpenCV detect mặt để crop vùng mặt |
+| Landmark model | `tensor_img` | `[1, 3, 256, 256]` | RGB, float32, normalize về khoảng `[-1, 1]` |
+
+Output model landmark:
+
+| Output | Shape/kiểu | Ý nghĩa |
+| --- | --- | --- |
+| `heatmaps` | `[1, 98, 64, 64]` | 98 heatmap, mỗi heatmap ứng với một landmark |
+| `landmarks` | `numpy.ndarray`, shape `[98, 2]` | Tọa độ `(x, y)` của 98 điểm trên ảnh gốc |
+| `face_box` | `(x, y, w, h)` | Bounding box mặt được dùng để crop |
+
+Output sau khi tính metric:
+
+| Field | Kiểu | Ý nghĩa |
+| --- | --- | --- |
+| `ear` | float hoặc `None` | Eye Aspect Ratio sau khi smooth |
+| `baseline_ear` | float | EAR nền sau calibration |
+| `is_calibrated` | bool | Đã đủ frame để calibrate chưa |
+| `eye_closed_streak` | int | Số frame nhắm mắt liên tiếp |
+| `head_yaw` | float | Góc yaw ước lượng từ mũi và hai mắt |
+| `head_direction` | string | `LEFT`, `RIGHT`, hoặc `FORWARD` |
+| `head_turn_score` | int | Điểm tích lũy quay đầu |
+| `head_status` | string | `SAFE`, `TURNING`, hoặc `VIOLATION` |
+
+Output chính của `ai.drowsiness.engine.process_frame()`:
+
+```json
+{
+  "status": "EYE_OPEN",
+  "should_create_violation": false,
+  "should_create_head_turn_violation": false,
+  "eye_closed_streak": 0,
+  "ear": 0.31,
+  "baseline_ear": 0.32,
+  "is_calibrated": true,
+  "head_yaw": 0.0,
+  "head_direction": "FORWARD",
+  "head_turn_score": 0,
+  "head_status": "SAFE",
+  "drowsiness_frames_count": 0,
+  "head_turn_frames_count": 0,
+  "drowsiness_video_frames": [],
+  "head_turn_video_frames": []
+}
+```
+
+Các giá trị `status` có thể gặp:
+
+- `NO_FACE`: không detect được mặt.
+- `CALIBRATING`: đang thu frame để lấy `baseline_ear`.
+- `EYE_OPEN`: mắt đang mở.
+- `EYE_CLOSED`: mắt đang nhắm theo ngưỡng.
+
+### Phone Usage Model
+
+File weights:
+
+```text
+ai/models/model_ep26_val0.9268.pth
+```
+
+Module liên quan:
+
+- `ai/phone/model.py`: định nghĩa `PhoneCNNGRU`.
+- `ai/phone/engine.py`: load model, gom sequence frame, predict phone usage.
+- `ai/phone/state.py`: lưu frame buffer theo device.
+
+Input runtime:
+
+| Bước | Input | Shape/kiểu | Ghi chú |
+| --- | --- | --- | --- |
+| API frame | `image_file` | file ảnh | Đọc bằng Pillow, giữ RGB |
+| Frame buffer | `state.frames` | deque | Lưu các frame gần nhất theo device |
+| Model input | `batch` | `[1, 12, 3, 112, 112]` | 12 frame, RGB, normalize ImageNet |
+
+Output model:
+
+| Output | Shape/kiểu | Ý nghĩa |
+| --- | --- | --- |
+| `logits` | `[1, 2]` | Điểm raw cho 2 class |
+| `probabilities` | `[2]` | Xác suất sau softmax |
+| `label` | string | `Safe` hoặc `Phone` |
+| `phone_probability` | float | Xác suất class `Phone` |
+
+Output chính của `ai.phone.engine.process_frame()`:
+
+```json
+{
+  "status": "SAFE",
+  "label": "Safe",
+  "confidence": 0.91,
+  "phone_probability": 0.09,
+  "frames_collected": 12,
+  "sequence_length": 12,
+  "should_create_violation": false,
+  "video_frames": []
+}
+```
+
+Các giá trị `status` có thể gặp:
+
+- `COLLECTING`: chưa đủ `PHONE_SEQUENCE_LENGTH` frame để predict.
+- `SAFE`: không phát hiện sử dụng điện thoại.
+- `PHONE`: phát hiện sử dụng điện thoại và vượt threshold.
+
+## API Response
+
+Response realtime khi không tạo vi phạm:
 
 ```json
 {
@@ -231,26 +247,41 @@ Response khi khong tao vi pham:
 }
 ```
 
-Response khi tao vi pham:
+Response khi tạo vi phạm:
 
 ```json
 {
   "ok": true,
+  "eye_status": "EYE_CLOSED",
+  "eye_closed_streak": 8,
+  "ear": 0.14,
+  "baseline_ear": 0.31,
+  "is_calibrated": true,
+  "head_yaw": 0.0,
+  "head_direction": "FORWARD",
+  "head_turn_score": 0,
+  "head_status": "SAFE",
+  "phone_status": "SAFE",
+  "phone_label": "Safe",
+  "phone_confidence": 0.91,
+  "phone_probability": 0.09,
+  "phone_frames_collected": 12,
+  "phone_sequence_length": 12,
   "violation": true,
   "created": true,
   "violation_id": 1,
-  "violation_kind": "phone",
+  "violation_kind": "eye",
   "has_video": true
 }
 ```
 
-Gia tri `violation_kind` co the la:
+`violation_kind` có thể là:
 
-- `eye`
-- `head`
-- `phone`
+- `eye`: vi phạm buồn ngủ/nhắm mắt.
+- `head`: vi phạm quay đầu.
+- `phone`: vi phạm sử dụng điện thoại.
 
-Loi thuong gap:
+Lỗi thường gặp:
 
 - `400 Missing image`
 - `401 Missing X-DEVICE-TOKEN`
@@ -262,29 +293,9 @@ Loi thuong gap:
 - `500 Phone AI error: ...`
 - `500 Failed to export violation video`
 
-## Web Routes
-
-```text
-/                                  Login page
-/admin/                            Django admin
-/accounts/register/                Register
-/accounts/login/                   Login
-/accounts/logout/                  Logout
-/accounts/profile/                 Profile
-/violations/list/                  Driver violation list
-/violations/detail/<violation_id>/ Violation detail
-/violations/<violation_id>/appeal/ Create appeal
-/violations/admin/appeals/         Staff appeal list
-/violations/admin/appeals/<id>/    Staff appeal detail
-/violations/admin/appeals/<id>/review/ Approve/reject appeal
-/devices/<id>/live/                Live camera and AI status
-/devices/<id>/frame/               Latest device frame
-/api/upload/                       Device upload API
-```
-
 ## Settings
 
-Quan trong trong `core/settings.py`:
+Các cấu hình chính trong `core/settings.py`:
 
 ```python
 AUTH_USER_MODEL = "accounts.Account"
@@ -292,13 +303,19 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "violation_list"
 LOGOUT_REDIRECT_URL = "login"
 
-DROWSINESS_MODEL_PATH = BASE_DIR / "ai" / "models" / "face_landmarker.task"
+DROWSINESS_LANDMARK98_MODEL_PATH = BASE_DIR / "ai" / "models" / "landmark_98_best.pth"
+DROWSINESS_LANDMARK98_DEVICE = "auto"
+DROWSINESS_FACE_CROP_MARGIN = 0.25
+DROWSINESS_FACE_MIN_SIZE = 40
+DROWSINESS_FACE_SCALE_FACTOR = 1.1
+DROWSINESS_FACE_MIN_NEIGHBORS = 5
 DROWSINESS_FPS = 4
 DROWSINESS_EYE_CLOSED_RATIO = 0.75
 DROWSINESS_EYE_CLOSED_ABS = 0.20
 DROWSINESS_EYE_CLOSED_FRAMES = 2 * DROWSINESS_FPS
 DROWSINESS_CATEGORY_NAME = "Drowsiness"
 DROWSINESS_VIOLATION_COOLDOWN_SECONDS = 30
+DROWSINESS_CALIB_FRAMES = 10
 
 HEAD_TURN_CATEGORY_NAME = "Head Turn"
 HEAD_TURN_VIOLATION_COOLDOWN_SECONDS = 20
@@ -316,27 +333,22 @@ PHONE_CONFIDENCE_THRESHOLD = 0.7
 PHONE_CLASS_LABELS = ["Safe", "Phone"]
 ```
 
-Database/static/media:
+Ghi chú:
 
-```python
-DATABASES["default"]["ENGINE"] = "django.db.backends.sqlite3"
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "static"
-STATICFILES_DIRS = ["core/static"]
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
-TIME_ZONE = "Asia/Ho_Chi_Minh"
-```
+- `DROWSINESS_LANDMARK98_DEVICE = "auto"` sẽ dùng GPU nếu `torch.cuda.is_available()` là `True`, ngược lại dùng CPU.
+- `DROWSINESS_HEAD_YAW_THRESHOLD` có thể cần chỉnh lại sau khi test camera thật, vì yaw hiện được ước lượng từ landmark 2D.
+- `PHONE_SEQUENCE_LENGTH` càng lớn thì dự đoán ổn định hơn nhưng phản hồi chậm hơn.
 
 ## Run Locally
 
-Yeu cau:
+Yêu cầu:
 
 - Python 3.10
 - Virtualenv
-- `ffmpeg` neu muon video evidence phat on dinh tren browser
+- PyTorch/TorchVision đúng môi trường CPU hoặc CUDA
+- `ffmpeg` nếu muốn video bằng chứng phát ổn định trên browser
 
-Chay local:
+Cài và chạy local:
 
 ```bash
 python -m venv venv310
@@ -347,7 +359,13 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Truy cap:
+Kiểm tra PyTorch:
+
+```bash
+python -c "import torch, torchvision; print(torch.__version__); print(torchvision.__version__); print(torch.cuda.is_available())"
+```
+
+Truy cập:
 
 ```text
 Web:   http://127.0.0.1:8000/
@@ -356,14 +374,14 @@ Admin: http://127.0.0.1:8000/admin/
 
 ## Demo Data
 
-Can tao toi thieu:
+Cần tạo tối thiểu:
 
-1. `Account` co `card_uid`.
+1. `Account` có `card_uid`.
 2. `Vehicle`.
-3. `Device` active, co `token`, gan voi `Vehicle`.
-4. Category co the tao san hoac de API tu tao: `Drowsiness`, `Head Turn`, `Phone`.
+3. `Device` active, có `token`, gắn với `Vehicle`.
+4. Category có thể tạo sẵn hoặc để API tự tạo: `Drowsiness`, `Head Turn`, `Phone`.
 
-Sau do upload frame bang curl hoac client thiet bi:
+Sau đó upload frame bằng curl hoặc client thiết bị:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/upload/ \
@@ -371,6 +389,94 @@ curl -X POST http://127.0.0.1:8000/api/upload/ \
   -F "card_uid=<driver-card-uid>" \
   -F "image=@frame.jpg"
 ```
+
+## Web Routes
+
+```text
+/                                      Login page
+/admin/                                Django admin
+/accounts/register/                    Register
+/accounts/login/                       Login
+/accounts/logout/                      Logout
+/accounts/profile/                     Profile
+/violations/list/                      Driver violation list
+/violations/detail/<violation_id>/     Violation detail
+/violations/<violation_id>/appeal/     Create appeal
+/violations/admin/appeals/             Staff appeal list
+/violations/admin/appeals/<id>/        Staff appeal detail
+/violations/admin/appeals/<id>/review/ Approve/reject appeal
+/devices/<id>/live/                    Live camera and AI status
+/devices/<id>/frame/                   Latest device frame
+/api/upload/                           Device upload API
+```
+
+## Domain Model
+
+### Account
+
+`accounts.Account` là custom user model, đăng nhập bằng `email`.
+
+Thông tin chính:
+
+- `email`, `username`, `first_name`, `last_name`, `phone_number`
+- `card_uid`: UID thẻ RFID để map frame upload với tài xế
+- `is_admin`, `is_staff`, `is_active`, `is_superadmin`
+- `UserImage`: lưu ảnh người dùng, có thể đánh dấu avatar
+
+### Vehicle
+
+`vehicles.Vehicle` lưu thông tin xe:
+
+- `license_plate`
+- `model`
+- `registration_date`
+
+### Device
+
+`devices.Device` đại diện cho camera/thiết bị gắn trên xe:
+
+- `name`
+- `token`: token unique, gửi trong header `X-DEVICE-TOKEN`
+- `vehicle`: xe đang gắn với thiết bị
+- `is_active`
+- `last_seen`
+- `latest_frame`, `latest_frame_at`
+
+### Category
+
+`categories.Category` định nghĩa loại vi phạm:
+
+- `name`
+- `description`
+- `severality_level`
+- `is_active`
+- `created_at`
+
+### Violation
+
+`violations.Violation` là bản ghi vi phạm:
+
+- `category`
+- `reporter`: tài xế bị ghi nhận
+- `vehicle`
+- `title`, `description`
+- `reported_at`
+- `image`: ảnh bằng chứng/thumbnail
+- `video`: video bằng chứng
+- `viewed`
+- `status`: `pending`, `confirmed`, `dismissed`, `appealed`
+
+### ViolationAppeal
+
+`violations.ViolationAppeal` cho phép tài xế kháng cáo:
+
+- Mỗi vi phạm chỉ có một appeal.
+- `reason`
+- `status`: `pending`, `approved`, `rejected`
+- `admin_note`
+- `created_at`, `reviewed_at`
+
+Khi staff chấp nhận appeal, violation chuyển sang `dismissed`. Khi từ chối, violation chuyển sang `confirmed`.
 
 ## Docker
 
@@ -386,50 +492,49 @@ Run:
 docker run -p 10000:10000 core-app
 ```
 
-Truy cap:
+Truy cập:
 
 ```text
 http://127.0.0.1:10000/
 ```
 
-Dockerfile hien tai:
+Dockerfile hiện tại:
 
-- Dung `python:3.10-slim`.
-- Cai thu vien he thong cho OpenCV/MediaPipe.
-- Cai dependencies tu `requirements.txt`.
-- Chay `collectstatic`.
-- Chay Gunicorn tai port `10000`.
-- Dung `--workers 1`.
+- Dùng `python:3.10-slim`.
+- Cài thư viện hệ thống cho OpenCV/PyTorch.
+- Cài dependencies từ `requirements.txt`.
+- Chạy `collectstatic`.
+- Chạy Gunicorn tại port `10000`.
+- Dùng `--workers 1`.
 
-Luu y: Dockerfile hien chua cai `ffmpeg`. Neu can video H.264 web-compatible, nen them `ffmpeg` vao apt packages.
+Lưu ý: Dockerfile hiện chưa cài `ffmpeg`. Nếu cần video H.264 web-compatible, nên thêm `ffmpeg` vào apt packages.
 
 ## Runtime Files
 
-Cac file/thu muc runtime:
+Các file/thư mục runtime:
 
 - `db.sqlite3`: database local
-- `media/live/`: frame moi nhat cua device
-- `media/violations/`: anh bang chung
-- `media/violations/videos/`: video bang chung
+- `media/live/`: frame mới nhất của device
+- `media/violations/`: ảnh bằng chứng
+- `media/violations/videos/`: video bằng chứng
 - `static/`: collected static/static root
 
 ## Production Notes
 
-Cau hinh hien tai phu hop demo/prototype hon production:
+Cấu hình hiện tại phù hợp demo/prototype hơn production:
 
 - `DEBUG=True`
 - `ALLOWED_HOSTS=["*"]`
 - `SECRET_KEY` hard-code
 - SQLite
-- API upload chi xac thuc bang `X-DEVICE-TOKEN`
-- AI state nam trong RAM
+- API upload chỉ xác thực bằng `X-DEVICE-TOKEN`
+- AI state nằm trong RAM
 
-Huong nang cap:
+Hướng nâng cấp:
 
-- Dua secret va config ra environment variables.
-- Dung PostgreSQL/MySQL thay SQLite.
-- Dung Redis cho realtime AI state neu scale multi-worker.
-- Them rate limit va logging cho `/api/upload/`.
-- Cai `ffmpeg` trong Docker image.
-- Bo sung test cho upload API, cooldown, appeal workflow va AI inference wrapper.
-
+- Đưa secret và config ra environment variables.
+- Dùng PostgreSQL/MySQL thay SQLite.
+- Dùng Redis cho realtime AI state nếu scale multi-worker.
+- Thêm rate limit và logging cho `/api/upload/`.
+- Cài `ffmpeg` trong Docker image.
+- Bổ sung test cho upload API, cooldown, appeal workflow và AI inference wrapper.

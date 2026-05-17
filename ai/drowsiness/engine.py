@@ -1,13 +1,13 @@
 import io
-import numpy as np
-import cv2
-import mediapipe as mp
-from PIL import Image
-from django.conf import settings
 
+import cv2
+import numpy as np
+from django.conf import settings
+from PIL import Image
+
+from .landmark98_loader import detect_landmarks
+from .metrics import get_ear, get_head_yaw_98
 from .state import get_state
-from .metrics import get_ear, get_head_yaw
-from .mediapipe_loader import get_landmarker
 
 
 def read_image(image_file):
@@ -29,12 +29,6 @@ def process_frame(image_file, device_key):
 
     frame = read_image(image_file)
 
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-
-    landmarker = get_landmarker()
-    result = landmarker.detect(mp_image)
-
     eye_closed_ratio = float(getattr(settings, "DROWSINESS_EYE_CLOSED_RATIO", 0.85))
     eye_closed_abs = float(getattr(settings, "DROWSINESS_EYE_CLOSED_ABS", 0.20))
     eye_closed_frames = int(getattr(settings, "DROWSINESS_EYE_CLOSED_FRAMES", 6))
@@ -46,8 +40,10 @@ def process_frame(image_file, device_key):
     head_turn_decay = int(getattr(settings, "DROWSINESS_HEAD_TURN_DECAY", 1))
     calib_frames = int(getattr(settings, "DROWSINESS_CALIB_FRAMES", 10))
 
-    # ===== Không thấy mặt =====
-    if not result.face_landmarks or not result.facial_transformation_matrixes:
+    result = detect_landmarks(frame)
+
+    # ===== No face =====
+    if result is None:
         state.eye_closed_streak = 0
         state.is_sleeping = False
         state.drowsiness_frames.clear()
@@ -78,11 +74,10 @@ def process_frame(image_file, device_key):
             "head_turn_video_frames": [],
         }
 
-    landmarks = result.face_landmarks[0]
-    transformation_matrix = result.facial_transformation_matrixes[0]
+    landmarks = result.landmarks
 
     # ===== HEAD TURN =====
-    yaw = get_head_yaw(transformation_matrix)
+    yaw = get_head_yaw_98(landmarks)
     state.last_yaw = float(yaw)
 
     head_turn_active = False
@@ -158,10 +153,7 @@ def process_frame(image_file, device_key):
         }
 
     # ===== EYE DETECT =====
-    is_eye_closed = (
-        ear < state.baseline_ear * eye_closed_ratio
-        or ear < eye_closed_abs
-    )
+    is_eye_closed = ear < state.baseline_ear * eye_closed_ratio or ear < eye_closed_abs
 
     if is_eye_closed:
         state.eye_closed_streak += 1
