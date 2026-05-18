@@ -1,110 +1,132 @@
-{% extends "base.html" %} {% block content %}
-<div class="container py-4">
-  <a href="{% url 'appeal_review_list' %}" class="btn btn-link px-0 mb-3"
-    >← Quay lại danh sách</a
-  >
+{% extends "base.html" %}
 
-  {% if messages %} {% for message in messages %}
-  <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-  {% endfor %} {% endif %}
+{% block title %}Duyệt kháng cáo #{{ appeal.id }} | QL Vi phạm{% endblock %}
 
-  <div class="row">
-    <div class="col-lg-5 mb-3">
-      <div class="card shadow-sm">
-        <div class="card-header bg-white">
-          <strong>Bằng chứng vi phạm</strong>
-        </div>
-        <div class="card-body">
-          {% if violation.image %}
-          <img
-            src="{{ violation.image.url }}"
-            class="img-fluid rounded border mb-3"
-            alt="evidence"
-          />
-          {% endif %} {% if violation.video %}
-          <video class="w-100 rounded border" controls>
-            <source src="{{ violation.video.url }}" />
-          </video>
-          {% endif %} {% if not violation.image and not violation.video %}
-          <div class="text-center text-muted py-5 border rounded">
-            Không có bằng chứng
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
+{% block content %}
+<div class="detail-toolbar">
+  <a href="{% url 'appeal_review_list' %}" class="btn btn-link px-0">
+    ← Quay lại danh sách
+  </a>
+  <span>Kháng cáo #{{ appeal.id }}</span>
+</div>
 
-    <div class="col-lg-7">
-      <div class="card shadow-sm mb-3">
-        <div class="card-body">
-          <h4>Chi tiết kháng cáo</h4>
-          <hr />
-
-          <p><strong>Tài xế:</strong> {{ appeal.driver.get_full_name }}</p>
-          <p><strong>Biển số:</strong> {{ violation.vehicle.license_plate }}</p>
-          <p><strong>Loại lỗi:</strong> {{ violation.category.name }}</p>
-          <p><strong>Ngày gửi:</strong> {{ appeal.created_at }}</p>
-          <p><strong>Lý do:</strong><br />{{ appeal.reason }}</p>
-
-          {% if appeal.admin_note %}
-          <p><strong>Ghi chú admin:</strong><br />{{ appeal.admin_note }}</p>
-          {% endif %}
-
-          <p>
-            <strong>Trạng thái:</strong>
-            {% if appeal.status == "pending" %}
-            <span class="badge badge-warning">Chờ duyệt</span>
-            {% elif appeal.status == "approved" %}
-            <span class="badge badge-success">Đã chấp nhận</span>
-            {% else %}
-            <span class="badge badge-danger">Đã từ chối</span>
-            {% endif %}
-          </p>
-        </div>
+<div class="row">
+  <div class="col-lg-5 mb-3">
+    <section class="data-card evidence-card">
+      <div class="section-title-row">
+        <h2>Bằng chứng vi phạm</h2>
       </div>
 
-      {% if appeal.status == "pending" %}
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5>Xử lý kháng cáo</h5>
-          <form
-            method="post"
-            action="{% url 'appeal_review_action' appeal.id %}"
-          >
-            {% csrf_token %}
-            <div class="form-group">
-              <label for="admin_note">Ghi chú quản trị viên</label>
-              <textarea
-                name="admin_note"
-                id="admin_note"
-                rows="4"
-                class="form-control"
-              ></textarea>
-            </div>
-
-            <div class="d-flex">
-              <button
-                type="submit"
-                name="action"
-                value="approve"
-                class="btn btn-success mr-2"
-              >
-                Chấp nhận kháng cáo
-              </button>
-              <button
-                type="submit"
-                name="action"
-                value="reject"
-                class="btn btn-danger"
-              >
-                Từ chối kháng cáo
-              </button>
-            </div>
-          </form>
-        </div>
+      {% if violation.image %}
+      <img
+        src="{{ violation.image.url }}"
+        class="evidence-media mb-3"
+        alt="Bằng chứng"
+      />
+      {% endif %}
+      {% if violation.video %}
+      <video class="evidence-media" controls>
+        <source src="{{ violation.video.url }}" />
+      </video>
+      {% endif %}
+      {% if not violation.image and not violation.video %}
+      <div class="empty-state evidence-empty">
+        <strong>Không có bằng chứng</strong>
+        <span>Chưa có hình ảnh hoặc video cho hồ sơ này.</span>
       </div>
       {% endif %}
-    </div>
+    </section>
+  </div>
+
+  <div class="col-lg-7">
+    <section class="data-card mb-3">
+      <div class="detail-head">
+        <div>
+          <p class="eyebrow">Xem xét đơn</p>
+          <h1>Chi tiết kháng cáo</h1>
+          <p>Biển số: <strong>{{ violation.vehicle.license_plate }}</strong></p>
+        </div>
+        {% if appeal.status == "pending" %}
+        <span class="status-pill large warning">Chờ duyệt</span>
+        {% elif appeal.status == "approved" %}
+        <span class="status-pill large success">Đã chấp nhận</span>
+        {% else %}
+        <span class="status-pill large danger">Đã từ chối</span>
+        {% endif %}
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span>Tài xế</span>
+          <strong>{{ appeal.driver.get_full_name }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>Loại lỗi</span>
+          <strong>{{ violation.category.name }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>Ngày gửi</span>
+          <strong>{{ appeal.created_at }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>Biển số</span>
+          <strong>{{ violation.vehicle.license_plate }}</strong>
+        </div>
+      </div>
+
+      <div class="note-box">
+        <span>Lý do</span>
+        <p>{{ appeal.reason }}</p>
+      </div>
+
+      {% if appeal.admin_note %}
+      <div class="note-box mb-0">
+        <span>Ghi chú admin</span>
+        <p>{{ appeal.admin_note }}</p>
+      </div>
+      {% endif %}
+    </section>
+
+    {% if appeal.status == "pending" %}
+    <section class="data-card">
+      <div class="section-title-row">
+        <h2>Xử lý kháng cáo</h2>
+      </div>
+
+      <form method="post" action="{% url 'appeal_review_action' appeal.id %}">
+        {% csrf_token %}
+        <div class="form-group">
+          <label for="admin_note">Ghi chú quản trị viên</label>
+          <textarea
+            name="admin_note"
+            id="admin_note"
+            rows="4"
+            class="form-control"
+            placeholder="Nhập ghi chú phản hồi cho tài xế..."
+          ></textarea>
+        </div>
+
+        <div class="form-actions justify-content-start">
+          <button
+            type="submit"
+            name="action"
+            value="approve"
+            class="btn btn-success"
+          >
+            Chấp nhận kháng cáo
+          </button>
+          <button
+            type="submit"
+            name="action"
+            value="reject"
+            class="btn btn-danger"
+          >
+            Từ chối kháng cáo
+          </button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

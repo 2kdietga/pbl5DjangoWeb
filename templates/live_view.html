@@ -1,84 +1,193 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Live Camera - Device {{ device.id }}</title>
     <style>
+      :root {
+        --bg: #101828;
+        --panel: #172033;
+        --panel-strong: #1f2a44;
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #f8fafc;
+        --muted: #98a2b3;
+        --good: #22c55e;
+        --warn: #f59e0b;
+        --bad: #ef4444;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
-        font-family: Arial, sans-serif;
-        background: #111;
-        color: white;
-        text-align: center;
+        min-height: 100vh;
         margin: 0;
-        padding: 20px;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 32rem),
+          linear-gradient(135deg, #101828 0%, #111827 48%, #0f172a 100%);
+        font-family:
+          Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
-      h1 {
-        margin-bottom: 10px;
+      .live-shell {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0;
       }
 
-      .meta {
-        margin-bottom: 20px;
-        color: #bbb;
+      .live-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-end;
+        margin-bottom: 22px;
       }
 
-      img {
-        width: 90%;
-        max-width: 900px;
-        border: 3px solid #444;
-        border-radius: 12px;
-        background: #222;
+      .live-header p {
+        margin: 0 0 6px;
+        color: #5eead4;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
       }
 
-      #statusBox {
-        margin-top: 20px;
-        font-size: 20px;
-        font-weight: bold;
-        line-height: 1.8;
+      .live-header h1 {
+        margin: 0;
+        font-size: 30px;
       }
 
-      .label {
-        color: #bbb;
-        margin-right: 8px;
+      .device-meta {
+        color: var(--muted);
+        text-align: right;
+        line-height: 1.7;
+      }
+
+      .live-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .camera-panel,
+      .status-panel {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(23, 32, 51, 0.86);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.32);
+        backdrop-filter: blur(10px);
+      }
+
+      .camera-panel {
+        padding: 14px;
+      }
+
+      #camera {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        object-fit: contain;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #0b1220;
+      }
+
+      .status-panel {
+        padding: 18px;
+      }
+
+      .status-panel h2 {
+        margin: 0 0 16px;
+        font-size: 18px;
+      }
+
+      .metric {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 13px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .metric:first-of-type {
+        border-top: 0;
+      }
+
+      .metric span:first-child {
+        color: var(--muted);
+      }
+
+      .metric strong,
+      .metric span:last-child {
+        font-weight: 800;
+      }
+
+      .status-value {
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--panel-strong);
+      }
+
+      @media (max-width: 900px) {
+        .live-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .live-header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .device-meta {
+          text-align: left;
+        }
       }
     </style>
   </head>
 
   <body>
-    <h1>Live Camera - Device {{ device.id }}</h1>
+    <main class="live-shell">
+      <header class="live-header">
+        <div>
+          <p>Live camera</p>
+          <h1>Device {{ device.id }}</h1>
+        </div>
+        <div class="device-meta">
+          <div>{{ device.name }}</div>
+          <div>Last frame: {{ device.latest_frame_at|default:"Chưa có ảnh" }}</div>
+        </div>
+      </header>
 
-    <div class="meta">
-      Device: {{ device.name }} | Last frame: {{
-      device.latest_frame_at|default:"Chưa có ảnh" }}
-    </div>
+      <section class="live-grid">
+        <div class="camera-panel">
+          <img id="camera" src="/devices/{{ device.id }}/frame/" alt="Live camera" />
+        </div>
 
-    <img id="camera" src="/devices/{{ device.id }}/frame/" alt="Live camera" />
-
-    <div id="statusBox">
-      <div><span class="label">Eye:</span><span id="eyeStatus">...</span></div>
-      <div>
-        <span class="label">Eye streak:</span><span id="eyeStreak">0</span>
-      </div>
-
-      <div>
-        <span class="label">Head:</span><span id="headStatus">...</span>
-      </div>
-      <div>
-        <span class="label">Head dir:</span
-        ><span id="headDirection">FORWARD</span>
-      </div>
-      <div>
-        <span class="label">Head score:</span><span id="headScore">0</span>
-      </div>
-      <div><span class="label">Yaw:</span><span id="headYaw">0</span></div>
-      <div><span class="label">Phone:</span><span id="phoneStatus">...</span></div>
-      <div>
-        <span class="label">Phone prob:</span><span id="phoneProbability">0</span>
-      </div>
-      <div>
-        <span class="label">Phone frames:</span><span id="phoneFrames">0</span>
-      </div>
-    </div>
+        <aside class="status-panel" id="statusBox">
+          <h2>Chỉ số theo dõi</h2>
+          <div class="metric">
+            <span>Eye</span><span class="status-value" id="eyeStatus">...</span>
+          </div>
+          <div class="metric"><span>Eye streak</span><strong id="eyeStreak">0</strong></div>
+          <div class="metric">
+            <span>Head</span><span class="status-value" id="headStatus">...</span>
+          </div>
+          <div class="metric"><span>Head dir</span><strong id="headDirection">FORWARD</strong></div>
+          <div class="metric"><span>Head score</span><strong id="headScore">0</strong></div>
+          <div class="metric"><span>Yaw</span><strong id="headYaw">0</strong></div>
+          <div class="metric">
+            <span>Phone</span><span class="status-value" id="phoneStatus">...</span>
+          </div>
+          <div class="metric"><span>Phone prob</span><strong id="phoneProbability">0</strong></div>
+          <div class="metric"><span>Phone frames</span><strong id="phoneFrames">0</strong></div>
+        </aside>
+      </section>
+    </main>
 
     <script>
       const img = document.getElementById("camera");
@@ -95,9 +204,14 @@
       const phoneFramesText = document.getElementById("phoneFrames");
 
       const intervalMs = 500;
-      const eyeClosedFrames = 6; // đổi theo settings của bạn nếu cần
+      const eyeClosedFrames = 6;
 
-      // load frame
+      function setState(element, text, color) {
+        element.innerText = text;
+        element.style.color = color;
+        element.style.borderColor = color;
+      }
+
       setInterval(() => {
         img.src = "/devices/{{ device.id }}/frame/?t=" + new Date().getTime();
       }, intervalMs);
@@ -108,22 +222,17 @@
         })
           .then((res) => res.json())
           .then((data) => {
-            // ===== EYE =====
             const eyeStreak = data.eye_closed_streak || 0;
             eyeStreakText.innerText = eyeStreak;
 
             if (eyeStreak >= eyeClosedFrames) {
-              eyeStatusText.innerText = "NGỦ GỤC";
-              eyeStatusText.style.color = "red";
+              setState(eyeStatusText, "NGỦ GỤC", "var(--bad)");
             } else if (eyeStreak > 0) {
-              eyeStatusText.innerText = "ĐANG NHẮM MẮT";
-              eyeStatusText.style.color = "orange";
+              setState(eyeStatusText, "ĐANG NHẮM MẮT", "var(--warn)");
             } else {
-              eyeStatusText.innerText = "TỈNH TÁO";
-              eyeStatusText.style.color = "lime";
+              setState(eyeStatusText, "TỈNH TÁO", "var(--good)");
             }
 
-            // ===== HEAD =====
             const headStatus = data.head_status || "SAFE";
             const headDirection = data.head_direction || "FORWARD";
             const headScore = data.head_turn_score || 0;
@@ -134,17 +243,13 @@
             headYawText.innerText = Number(headYaw).toFixed(1);
 
             if (headStatus === "VIOLATION") {
-              headStatusText.innerText = "VI PHẠM";
-              headStatusText.style.color = "red";
+              setState(headStatusText, "VI PHẠM", "var(--bad)");
             } else if (headStatus === "TURNING") {
-              headStatusText.innerText = "ĐANG QUAY ĐẦU";
-              headStatusText.style.color = "orange";
+              setState(headStatusText, "ĐANG QUAY ĐẦU", "var(--warn)");
             } else {
-              headStatusText.innerText = "AN TOÀN";
-              headStatusText.style.color = "lime";
+              setState(headStatusText, "AN TOÀN", "var(--good)");
             }
 
-            // ===== PHONE =====
             const phoneStatus = data.phone_status || "UNKNOWN";
             const phoneProbability = data.phone_probability ?? 0;
             const phoneFrames = data.phone_frames_collected || 0;
@@ -154,22 +259,17 @@
             phoneFramesText.innerText = phoneFrames;
 
             if (phoneStatus === "PHONE") {
-              phoneStatusText.style.color = "red";
+              setState(phoneStatusText, "PHONE", "var(--bad)");
             } else if (phoneStatus === "SAFE") {
-              phoneStatusText.style.color = "lime";
+              setState(phoneStatusText, "SAFE", "var(--good)");
             } else {
-              phoneStatusText.style.color = "gray";
+              setState(phoneStatusText, phoneStatus, "var(--muted)");
             }
           })
           .catch(() => {
-            eyeStatusText.innerText = "ERROR";
-            eyeStatusText.style.color = "gray";
-
-            headStatusText.innerText = "ERROR";
-            headStatusText.style.color = "gray";
-
-            phoneStatusText.innerText = "ERROR";
-            phoneStatusText.style.color = "gray";
+            setState(eyeStatusText, "ERROR", "var(--muted)");
+            setState(headStatusText, "ERROR", "var(--muted)");
+            setState(phoneStatusText, "ERROR", "var(--muted)");
           });
       }
 

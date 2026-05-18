@@ -1,143 +1,127 @@
 {% extends "base.html" %}
-<!--  -->
 {% load static %}
-<!--  -->
-{% block title %}Thông tin cá nhân
-<!--  -->
-{% endblock %}
-<!--  -->
+
+{% block title %}Thông tin cá nhân | QL Vi phạm{% endblock %}
+
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-center">
+<section class="page-heading">
   <div>
-    <h4 class="mb-1">Thông tin cá nhân</h4>
-    <div class="text-muted">Xem và cập nhật thông tin tài khoản</div>
+    <p class="eyebrow">Tài khoản</p>
+    <h1>Thông tin cá nhân</h1>
+    <p>Xem và cập nhật thông tin tài khoản của bạn.</p>
   </div>
 
-  <div>
-    {% if not edit %}
-    <a class="btn btn-outline-primary" href="{% url 'profile' %}?edit=1"
-      >Chỉnh sửa</a
-    >
-    {% endif %}
-  </div>
-</div>
+  {% if not edit %}
+  <a class="btn btn-primary" href="{% url 'profile' %}?edit=1">Chỉnh sửa</a>
+  {% endif %}
+</section>
 
 <div class="row">
-  <!-- Left: Avatar card -->
   <div class="col-md-4 mb-3">
-    <div class="card shadow-sm">
-      <div class="card-body text-center">
-        {% if request.user.get_avatar %}
-        <img
-          src="{{ request.user.get_avatar }}"
-          class="rounded-circle mb-3"
-          style="width: 120px; height: 120px; object-fit: cover"
-          alt="Avatar"
-        />
-        {% else %}
-        <div
-          class="rounded-circle bg-light border mx-auto mb-3"
-          style="
-            width: 120px;
-            height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          "
-        >
-          <span class="text-muted">No avatar</span>
+    <section class="data-card profile-card">
+      {% if request.user.get_avatar %}
+      <img
+        src="{{ request.user.get_avatar }}"
+        class="profile-avatar"
+        alt="Avatar"
+      />
+      {% else %}
+      <div class="profile-avatar profile-avatar-empty">
+        {{ request.user.first_name|default:request.user.username|first|upper }}
+      </div>
+      {% endif %}
+
+      <h2>{{ request.user.get_full_name|default:request.user.username }}</h2>
+      <p>{{ request.user.email }}</p>
+
+      <div class="profile-meta">
+        <div>
+          <span>Username</span>
+          <strong>{{ request.user.username }}</strong>
         </div>
-        {% endif %}
-
-        <div class="font-weight-bold">
-          {{ request.user.get_full_name|default:request.user.username }}
+        <div>
+          <span>SĐT</span>
+          <strong>{{ request.user.phone_number|default:"-" }}</strong>
         </div>
-        <div class="text-muted small">{{ request.user.email }}</div>
-
-        <hr />
-
-        <div class="text-left small">
-          <div class="d-flex justify-content-between">
-            <span class="text-muted">Username</span>
-            <span>{{ request.user.username }}</span>
-          </div>
-          <div class="d-flex justify-content-between mt-2">
-            <span class="text-muted">SĐT</span>
-            <span>{{ request.user.phone_number|default:"-" }}</span>
-          </div>
-          <div class="d-flex justify-content-between mt-2">
-            <span class="text-muted">Mã thẻ</span>
-            <span>{{ request.user.card_uid|default:"Chưa gán" }}</span>
-          </div>
+        <div>
+          <span>Mã thẻ</span>
+          <strong>{{ request.user.card_uid|default:"Chưa gán" }}</strong>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 
-  <!-- Right: Form -->
   <div class="col-md-8">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <form method="POST" novalidate>
-          {% csrf_token %}
+    <section class="data-card">
+      <div class="section-title-row">
+        <h2>Hồ sơ</h2>
+      </div>
 
-          <div class="form-row">
-            <div class="form-group col-md-6">
-              <label>Họ</label>
-              {{ form.last_name }} {% if form.last_name.errors %}
-              <div class="text-danger small mt-1">
-                {{ form.last_name.errors|striptags }}
-              </div>
-              {% endif %}
-            </div>
+      <form method="POST" novalidate>
+        {% csrf_token %}
 
-            <div class="form-group col-md-6">
-              <label>Tên</label>
-              {{ form.first_name }} {% if form.first_name.errors %}
-              <div class="text-danger small mt-1">
-                {{ form.first_name.errors|striptags }}
-              </div>
-              {% endif %}
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group col-md-6">
-              <label>Username</label>
-              {{ form.username }} {% if form.username.errors %}
-              <div class="text-danger small mt-1">
-                {{ form.username.errors|striptags }}
-              </div>
-              {% endif %}
-            </div>
-
-            <div class="form-group col-md-6">
-              <label>Số điện thoại</label>
-              {{ form.phone_number }} {% if form.phone_number.errors %}
-              <div class="text-danger small mt-1">
-                {{ form.phone_number.errors|striptags }}
-              </div>
-              {% endif %}
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Email</label>
-            {{ form.email }} {% if form.email.errors %}
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label>Họ</label>
+            {{ form.last_name }}
+            {% if form.last_name.errors %}
             <div class="text-danger small mt-1">
-              {{ form.email.errors|striptags }}
+              {{ form.last_name.errors|striptags }}
             </div>
             {% endif %}
           </div>
-          {% if edit %}
-          <div class="d-flex justify-content-end">
-            <a href="{% url 'profile' %}" class="btn btn-light mr-2">Huỷ</a>
-            <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+
+          <div class="form-group col-md-6">
+            <label>Tên</label>
+            {{ form.first_name }}
+            {% if form.first_name.errors %}
+            <div class="text-danger small mt-1">
+              {{ form.first_name.errors|striptags }}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label>Username</label>
+            {{ form.username }}
+            {% if form.username.errors %}
+            <div class="text-danger small mt-1">
+              {{ form.username.errors|striptags }}
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="form-group col-md-6">
+            <label>Số điện thoại</label>
+            {{ form.phone_number }}
+            {% if form.phone_number.errors %}
+            <div class="text-danger small mt-1">
+              {{ form.phone_number.errors|striptags }}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Email</label>
+          {{ form.email }}
+          {% if form.email.errors %}
+          <div class="text-danger small mt-1">
+            {{ form.email.errors|striptags }}
           </div>
           {% endif %}
-        </form>
-      </div>
-    </div>
+        </div>
+
+        {% if edit %}
+        <div class="form-actions">
+          <a href="{% url 'profile' %}" class="btn btn-light">Hủy</a>
+          <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+        </div>
+        {% endif %}
+      </form>
+    </section>
   </div>
 </div>
 
@@ -153,4 +137,5 @@
       });
   })();
 </script>
-{% endif %} {% endblock %}
+{% endif %}
+{% endblock %}

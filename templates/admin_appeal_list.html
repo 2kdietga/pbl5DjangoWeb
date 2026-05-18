@@ -1,66 +1,69 @@
-{% extends "base.html" %} {% block content %}
-<div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Danh sách kháng cáo</h3>
-    <a href="/admin/" class="btn btn-outline-secondary">Về Django Admin</a>
-  </div>
+{% extends "base.html" %}
 
-  {% if messages %} {% for message in messages %}
-  <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-  {% endfor %} {% endif %}
+{% block title %}Danh sách kháng cáo | QL Vi phạm{% endblock %}
 
-  <div class="card shadow-sm">
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead class="thead-light">
-            <tr>
-              <th>ID</th>
-              <th>Tài xế</th>
-              <th>Biển số</th>
-              <th>Loại lỗi</th>
-              <th>Ngày gửi</th>
-              <th>Trạng thái</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for appeal in appeals %}
-            <tr>
-              <td>#{{ appeal.id }}</td>
-              <td>{{ appeal.driver.get_full_name }}</td>
-              <td>{{ appeal.violation.vehicle.license_plate }}</td>
-              <td>{{ appeal.violation.category.name }}</td>
-              <td>{{ appeal.created_at }}</td>
-              <td>
-                {% if appeal.status == "pending" %}
-                <span class="badge badge-warning">Chờ duyệt</span>
-                {% elif appeal.status == "approved" %}
-                <span class="badge badge-success">Đã chấp nhận</span>
-                {% else %}
-                <span class="badge badge-danger">Đã từ chối</span>
-                {% endif %}
-              </td>
-              <td>
-                <a
-                  href="{% url 'appeal_review_detail' appeal.id %}"
-                  class="btn btn-sm btn-primary"
-                >
-                  Xem
-                </a>
-              </td>
-            </tr>
-            {% empty %}
-            <tr>
-              <td colspan="7" class="text-center text-muted py-4">
-                Chưa có kháng cáo nào
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Quản trị</p>
+    <h1>Danh sách kháng cáo</h1>
+    <p>Rà soát và xử lý các yêu cầu kháng cáo từ tài xế.</p>
   </div>
-</div>
+  <a href="/admin/" class="btn btn-outline-secondary">Về Django Admin</a>
+</section>
+
+<section class="data-card">
+  <div class="table-responsive">
+    <table class="table app-table mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Tài xế</th>
+          <th>Biển số</th>
+          <th>Loại lỗi</th>
+          <th>Ngày gửi</th>
+          <th>Trạng thái</th>
+          <th class="text-right">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for appeal in appeals %}
+        <tr>
+          <td>#{{ appeal.id }}</td>
+          <td>{{ appeal.driver.get_full_name }}</td>
+          <td><span class="plate-chip">{{ appeal.violation.vehicle.license_plate }}</span></td>
+          <td>{{ appeal.violation.category.name }}</td>
+          <td>{{ appeal.created_at }}</td>
+          <td>
+            {% if appeal.status == "pending" %}
+            <span class="status-pill warning">Chờ duyệt</span>
+            {% elif appeal.status == "approved" %}
+            <span class="status-pill success">Đã chấp nhận</span>
+            {% else %}
+            <span class="status-pill danger">Đã từ chối</span>
+            {% endif %}
+          </td>
+          <td class="text-right">
+            <a
+              href="{% url 'appeal_review_detail' appeal.id %}"
+              class="btn btn-sm btn-primary"
+            >
+              Xem
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state">
+              <strong>Chưa có kháng cáo nào</strong>
+              <span>Các đơn kháng cáo mới sẽ xuất hiện tại đây.</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}
