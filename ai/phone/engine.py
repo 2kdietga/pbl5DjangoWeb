@@ -71,6 +71,13 @@ def get_phone_model():
     return _MODEL
 
 
+def get_phone_class_index(labels):
+    for index, label in enumerate(labels):
+        if str(label).lower() == "phone":
+            return index
+    raise ValueError("PHONE_CLASS_LABELS must contain a 'Phone' label")
+
+
 def process_frame(image_file, device_key):
     state = get_state(device_key)
     frame_rgb = read_frame(image_file)
@@ -100,16 +107,16 @@ def process_frame(image_file, device_key):
         logits = get_phone_model()(batch)
         probabilities = torch.softmax(logits, dim=1)[0].detach().cpu()
 
-    class_index = int(torch.argmax(probabilities).item())
-    label = labels[class_index] if class_index < len(labels) else str(class_index)
-    confidence = float(probabilities[class_index].item())
-    phone_probability = float(probabilities[1].item()) if len(probabilities) > 1 else 0.0
+    phone_index = get_phone_class_index(labels)
+    phone_probability = float(probabilities[phone_index].item())
+    is_phone = phone_probability >= threshold
+    label = "Phone" if is_phone else "Safe"
+    confidence = phone_probability if is_phone else 1.0 - phone_probability
 
     state.last_label = label
     state.last_confidence = confidence
     state.last_phone_probability = phone_probability
 
-    is_phone = label.lower() == "phone" and phone_probability >= threshold
     should_create_violation = is_phone and not state.is_phone_active
     status = "PHONE" if is_phone else "SAFE"
 

@@ -131,6 +131,15 @@ class UploadAndDetectAPIView(APIView):
             should_create_eye_violation or should_create_head_turn_violation
             or should_create_phone_violation
         )
+        active_violation_kind = None
+        if status_eye == "EYE_CLOSED" and eye_closed_streak >= int(
+            getattr(settings, "DROWSINESS_EYE_CLOSED_FRAMES", 4)
+        ):
+            active_violation_kind = "eye"
+        elif head_status == "VIOLATION":
+            active_violation_kind = "head"
+        elif phone_status == "PHONE":
+            active_violation_kind = "phone"
 
         # ===== 8. NO VIOLATION =====
         if not should_create_any_violation:
@@ -152,7 +161,9 @@ class UploadAndDetectAPIView(APIView):
                     "phone_probability": phone_probability,
                     "phone_frames_collected": phone_frames_collected,
                     "phone_sequence_length": phone_sequence_length,
-                    "violation": False,
+                    "violation": active_violation_kind is not None,
+                    "created": False,
+                    "violation_kind": active_violation_kind,
                     "vehicle": vehicle.license_plate,
                     "driver": reporter.username,
                 },

@@ -5,8 +5,8 @@ import numpy as np
 from django.conf import settings
 from PIL import Image
 
-from .landmark98_loader import detect_landmarks
-from .metrics import get_ear, get_head_yaw_98
+from .mediapipe_loader import detect_landmarks
+from .metrics import get_ear_mediapipe, get_head_yaw
 from .state import get_state
 
 
@@ -31,7 +31,7 @@ def process_frame(image_file, device_key):
 
     eye_closed_ratio = float(getattr(settings, "DROWSINESS_EYE_CLOSED_RATIO", 0.85))
     eye_closed_abs = float(getattr(settings, "DROWSINESS_EYE_CLOSED_ABS", 0.20))
-    eye_closed_frames = int(getattr(settings, "DROWSINESS_EYE_CLOSED_FRAMES", 6))
+    eye_closed_frames = int(getattr(settings, "DROWSINESS_EYE_CLOSED_FRAMES", 4))
 
     head_yaw_threshold = float(getattr(settings, "DROWSINESS_HEAD_YAW_THRESHOLD", 25))
     head_turn_violation_frames = int(
@@ -77,7 +77,7 @@ def process_frame(image_file, device_key):
     landmarks = result.landmarks
 
     # ===== HEAD TURN =====
-    yaw = get_head_yaw_98(landmarks)
+    yaw = get_head_yaw(result.transformation_matrix)
     state.last_yaw = float(yaw)
 
     head_turn_active = False
@@ -122,7 +122,7 @@ def process_frame(image_file, device_key):
         head_status = "VIOLATION"
 
     # ===== EYE EAR =====
-    ear = get_ear(landmarks)
+    ear = get_ear_mediapipe(landmarks)
     ear = smooth(state.prev_ear, ear)
     state.prev_ear = ear
 

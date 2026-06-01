@@ -89,17 +89,23 @@ LOGOUT_REDIRECT_URL = 'login'
 
 
 # DROWSINESS SETTINGS
+DROWSINESS_MEDIAPIPE_MODEL_PATH = BASE_DIR / "ai" / "models" / "face_landmarker.task"
+DROWSINESS_MEDIAPIPE_MIN_FACE_DETECTION_CONFIDENCE = 0.5
+DROWSINESS_MEDIAPIPE_MIN_FACE_PRESENCE_CONFIDENCE = 0.5
+DROWSINESS_MEDIAPIPE_MIN_TRACKING_CONFIDENCE = 0.5
+
+# Kept for the unused landmark-98 backend in ai/drowsiness/landmark98_loader.py.
 DROWSINESS_LANDMARK98_MODEL_PATH = BASE_DIR / "ai" / "models" / "landmark_98_best.pth"
 DROWSINESS_LANDMARK98_DEVICE = "auto"
 DROWSINESS_FACE_CROP_MARGIN = 0.25
 DROWSINESS_FACE_MIN_SIZE = 40
 DROWSINESS_FACE_SCALE_FACTOR = 1.1
 DROWSINESS_FACE_MIN_NEIGHBORS = 5
-DROWSINESS_FPS = 4  # tốc độ frame ESP32 gửi
+DROWSINESS_FPS = 2  # tốc độ frame ESP32 gửi
 
 DROWSINESS_EYE_CLOSED_RATIO = 0.75 # nhạy theo baseline cá nhân, ví dụ baseline EAR = 0.3 thì ngưỡng nhắm mắt sẽ là 0.3 * 0.85 = 0.255
 DROWSINESS_EYE_CLOSED_ABS = 0.20 # ngưỡng tuyệt đối fallback, nếu EAR < 0.20 thì cũng tính là nhắm mắt dù chưa calibrate được baseline
-DROWSINESS_EYE_CLOSED_FRAMES = 2*DROWSINESS_FPS # nhắm khoảng 8 frame liên tục thì trigger, tương đương 8 / DROWSINESS_FPS giây, ví dụ 8 / 4 = 2 giây nhắm mắt liên tục sẽ bị tính là vi phạm
+DROWSINESS_EYE_CLOSED_FRAMES = 4 # nhắm mắt 4 frame liên tục thì tính là vi phạm
 
 
 DROWSINESS_CATEGORY_NAME = "Drowsiness"

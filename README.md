@@ -25,7 +25,7 @@ Hệ thống hiện hỗ trợ 3 nhóm vi phạm:
 core/
   accounts/        Custom user, auth, profile, card_uid
   ai/
-    drowsiness/    Landmark-98 EAR/yaw detection
+    drowsiness/    Landmark-98 reference pipeline for EAR/yaw detection
     phone/         CNN + GRU phone usage detection
     models/        AI model weights
   api/             Upload frame API
@@ -67,9 +67,9 @@ Luồng xử lý:
 
 ## AI Pipeline
 
-Hệ thống có 2 pipeline AI chạy trên mỗi frame upload:
+Tài liệu mô tả 2 pipeline AI xử lý frame upload:
 
-- Drowsiness + Head Turn: dùng model landmark 98 điểm.
+- Drowsiness + Head Turn: đặc tả theo model landmark 98 điểm.
 - Phone Usage: dùng model video classification CNN + GRU.
 
 State AI hiện lưu trong RAM theo `device_key`. Cách này phù hợp demo/prototype và cấu hình `Gunicorn --workers 1`. Nếu scale nhiều worker/server, cần chuyển state sang Redis hoặc storage dùng chung.
@@ -80,11 +80,11 @@ State AI hiện lưu trong RAM theo `device_key`. Cách này phù hợp demo/pro
 
 API nhận request dạng `multipart/form-data`.
 
-| Thành phần | Tên | Kiểu | Bắt buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| Header | `X-DEVICE-TOKEN` | string | Có | Token của thiết bị camera |
-| Form field | `card_uid` | string | Có | UID thẻ RFID để định danh tài xế |
-| Form file | `image` | image file | Có | Frame ảnh hiện tại từ camera |
+| Thành phần | Tên              | Kiểu       | Bắt buộc | Ý nghĩa                          |
+| ---------- | ---------------- | ---------- | -------- | -------------------------------- |
+| Header     | `X-DEVICE-TOKEN` | string     | Có       | Token của thiết bị camera        |
+| Form field | `card_uid`       | string     | Có       | UID thẻ RFID để định danh tài xế |
+| Form file  | `image`          | image file | Có       | Frame ảnh hiện tại từ camera     |
 
 Ví dụ:
 
@@ -105,38 +105,102 @@ ai/models/landmark_98_best.pth
 
 Module liên quan:
 
-- `ai/drowsiness/landmark98_loader.py`: load model, detect/crop mặt, tiền xử lý ảnh, suy luận heatmap.
+- `ai/drowsiness/landmark98_loader.py`: load model, detect/crop mặt, tiền xử lý ảnh và suy luận heatmap.
 - `ai/drowsiness/metrics.py`: tính EAR và yaw từ 98 landmark.
 - `ai/drowsiness/engine.py`: quản lý state, calibration, streak, trigger vi phạm.
 
-Input runtime của loader:
+Kiến trúc landmark-98:
 
-| Bước | Input | Shape/kiểu | Ghi chú |
-| --- | --- | --- | --- |
-| API frame | `image_file` | file ảnh | Đọc bằng Pillow, convert sang BGR |
-| Face detect | `frame_bgr` | `H x W x 3` | OpenCV detect mặt để crop vùng mặt |
-| Landmark model | `tensor_img` | `[1, 3, 256, 256]` | RGB, float32, normalize về khoảng `[-1, 1]` |
+```text
+Ảnh camera
+  -> Haar Cascade detect khuôn mặt lớn nhất
+  -> crop vuông có margin
+  -> resize 256 x 256, RGB, normalize [-1, 1]
+  -> MobileNetV2 feature extractor
+  -> 3 lớp ConvTranspose2d upsample
+  -> Conv2d head 98 channel + sigmoid
+  -> 98 heatmap landmark
+  -> argmax từng heatmap
+  -> ánh xạ landmark về tọa độ ảnh gốc
+  -> tính EAR, yaw và cập nhật state theo device
+```
+
+Input của landmark-98 loader:
+
+| Bước           | Input        | Shape/kiểu         | Ghi chú                                                 |
+| -------------- | ------------ | ------------------ | ------------------------------------------------------- |
+| API frame      | `image_file` | file ảnh           | Đọc bằng Pillow, convert sang BGR                       |
+| Face detect    | `frame_bgr`  | `H x W x 3`        | OpenCV Haar Cascade detect mặt lớn nhất                 |
+| Face crop      | `face_crop`  | ảnh vuông          | Mở rộng bounding box theo `DROWSINESS_FACE_CROP_MARGIN` |
+| Landmark model | `tensor_img` | `[1, 3, 256, 256]` | RGB, float32, normalize về khoảng `[-1, 1]`             |
 
 Output model landmark:
 
-| Output | Shape/kiểu | Ý nghĩa |
-| --- | --- | --- |
-| `heatmaps` | `[1, 98, 64, 64]` | 98 heatmap, mỗi heatmap ứng với một landmark |
-| `landmarks` | `numpy.ndarray`, shape `[98, 2]` | Tọa độ `(x, y)` của 98 điểm trên ảnh gốc |
-| `face_box` | `(x, y, w, h)` | Bounding box mặt được dùng để crop |
+| Output      | Shape/kiểu                       | Ý nghĩa                                      |
+| ----------- | -------------------------------- | -------------------------------------------- |
+| `heatmaps`  | `[1, 98, 64, 64]`                | 98 heatmap, mỗi heatmap ứng với một landmark |
+| `landmarks` | `numpy.ndarray`, shape `[98, 2]` | Tọa độ `(x, y)` của 98 điểm trên ảnh gốc     |
+| `face_box`  | `(x, y, w, h)`                   | Bounding box khuôn mặt được dùng để crop     |
+
+### Công thức Landmark-98
+
+Với mỗi heatmap landmark `H_i`, vị trí landmark trong heatmap là điểm có giá trị lớn nhất:
+
+```text
+(u_i, v_i) = argmax(H_i)
+```
+
+Sau khi crop mặt được mở rộng thành vùng vuông có cạnh `S`, tọa độ heatmap được ánh xạ về ảnh gốc:
+
+```text
+x_i = crop_x + u_i * S / heatmap_width
+y_i = crop_y + v_i * S / heatmap_height
+```
+
+EAR dùng 8 landmark quanh mỗi mắt. Với các điểm mắt theo thứ tự `p0 ... p7`:
+
+```text
+EAR_eye = (||p1 - p7|| + ||p2 - p6|| + ||p3 - p5||) / (3 * ||p0 - p4||)
+EAR = (EAR_left + EAR_right) / 2
+```
+
+EAR được làm mượt theo exponential moving average:
+
+```text
+EAR_smooth = (1 - alpha) * EAR_previous + alpha * EAR_current
+alpha = 0.2
+```
+
+Sau calibration, mắt được xem là nhắm khi:
+
+```text
+EAR_smooth < baseline_EAR * DROWSINESS_EYE_CLOSED_RATIO
+hoặc
+EAR_smooth < DROWSINESS_EYE_CLOSED_ABS
+```
+
+Yaw được ước lượng từ tâm hai mắt và chóp mũi. Model landmark-98 dùng pupil landmark `96`, `97` và nose tip landmark `54`:
+
+```text
+eye_center = (left_pupil + right_pupil) / 2
+interocular = ||left_pupil - right_pupil||
+yaw = ((nose_tip.x - eye_center.x) / interocular) * 45
+```
+
+Nếu `yaw > threshold`, đầu quay phải. Nếu `yaw < -threshold`, đầu quay trái. Vi phạm được tạo khi điểm tích lũy quay đầu đạt `DROWSINESS_HEAD_TURN_VIOLATION_FRAMES`.
 
 Output sau khi tính metric:
 
-| Field | Kiểu | Ý nghĩa |
-| --- | --- | --- |
-| `ear` | float hoặc `None` | Eye Aspect Ratio sau khi smooth |
-| `baseline_ear` | float | EAR nền sau calibration |
-| `is_calibrated` | bool | Đã đủ frame để calibrate chưa |
-| `eye_closed_streak` | int | Số frame nhắm mắt liên tiếp |
-| `head_yaw` | float | Góc yaw ước lượng từ mũi và hai mắt |
-| `head_direction` | string | `LEFT`, `RIGHT`, hoặc `FORWARD` |
-| `head_turn_score` | int | Điểm tích lũy quay đầu |
-| `head_status` | string | `SAFE`, `TURNING`, hoặc `VIOLATION` |
+| Field               | Kiểu              | Ý nghĩa                             |
+| ------------------- | ----------------- | ----------------------------------- |
+| `ear`               | float hoặc `None` | Eye Aspect Ratio sau khi smooth     |
+| `baseline_ear`      | float             | EAR nền sau calibration             |
+| `is_calibrated`     | bool              | Đã đủ frame để calibrate chưa       |
+| `eye_closed_streak` | int               | Số frame nhắm mắt liên tiếp         |
+| `head_yaw`          | float             | Góc yaw ước lượng từ mũi và hai mắt |
+| `head_direction`    | string            | `LEFT`, `RIGHT`, hoặc `FORWARD`     |
+| `head_turn_score`   | int               | Điểm tích lũy quay đầu              |
+| `head_status`       | string            | `SAFE`, `TURNING`, hoặc `VIOLATION` |
 
 Output chính của `ai.drowsiness.engine.process_frame()`:
 
@@ -183,20 +247,20 @@ Module liên quan:
 
 Input runtime:
 
-| Bước | Input | Shape/kiểu | Ghi chú |
-| --- | --- | --- | --- |
-| API frame | `image_file` | file ảnh | Đọc bằng Pillow, giữ RGB |
-| Frame buffer | `state.frames` | deque | Lưu các frame gần nhất theo device |
-| Model input | `batch` | `[1, 12, 3, 112, 112]` | 12 frame, RGB, normalize ImageNet |
+| Bước         | Input          | Shape/kiểu             | Ghi chú                            |
+| ------------ | -------------- | ---------------------- | ---------------------------------- |
+| API frame    | `image_file`   | file ảnh               | Đọc bằng Pillow, giữ RGB           |
+| Frame buffer | `state.frames` | deque                  | Lưu các frame gần nhất theo device |
+| Model input  | `batch`        | `[1, 12, 3, 112, 112]` | 12 frame, RGB, normalize ImageNet  |
 
 Output model:
 
-| Output | Shape/kiểu | Ý nghĩa |
-| --- | --- | --- |
-| `logits` | `[1, 2]` | Điểm raw cho 2 class |
-| `probabilities` | `[2]` | Xác suất sau softmax |
-| `label` | string | `Safe` hoặc `Phone` |
-| `phone_probability` | float | Xác suất class `Phone` |
+| Output              | Shape/kiểu | Ý nghĩa                |
+| ------------------- | ---------- | ---------------------- |
+| `logits`            | `[1, 2]`   | Điểm raw cho 2 class   |
+| `probabilities`     | `[2]`      | Xác suất sau softmax   |
+| `label`             | string     | `Safe` hoặc `Phone`    |
+| `phone_probability` | float      | Xác suất class `Phone` |
 
 Output chính của `ai.phone.engine.process_frame()`:
 
@@ -309,10 +373,10 @@ DROWSINESS_FACE_CROP_MARGIN = 0.25
 DROWSINESS_FACE_MIN_SIZE = 40
 DROWSINESS_FACE_SCALE_FACTOR = 1.1
 DROWSINESS_FACE_MIN_NEIGHBORS = 5
-DROWSINESS_FPS = 4
+DROWSINESS_FPS = 2
 DROWSINESS_EYE_CLOSED_RATIO = 0.75
 DROWSINESS_EYE_CLOSED_ABS = 0.20
-DROWSINESS_EYE_CLOSED_FRAMES = 2 * DROWSINESS_FPS
+DROWSINESS_EYE_CLOSED_FRAMES = 4
 DROWSINESS_CATEGORY_NAME = "Drowsiness"
 DROWSINESS_VIOLATION_COOLDOWN_SECONDS = 30
 DROWSINESS_CALIB_FRAMES = 10
@@ -336,7 +400,7 @@ PHONE_CLASS_LABELS = ["Safe", "Phone"]
 Ghi chú:
 
 - `DROWSINESS_LANDMARK98_DEVICE = "auto"` sẽ dùng GPU nếu `torch.cuda.is_available()` là `True`, ngược lại dùng CPU.
-- `DROWSINESS_HEAD_YAW_THRESHOLD` có thể cần chỉnh lại sau khi test camera thật, vì yaw hiện được ước lượng từ landmark 2D.
+- `DROWSINESS_HEAD_YAW_THRESHOLD` có thể cần chỉnh lại sau khi test camera thật, vì yaw được ước lượng từ landmark 2D.
 - `PHONE_SEQUENCE_LENGTH` càng lớn thì dự đoán ổn định hơn nhưng phản hồi chậm hơn.
 
 ## Run Locally
