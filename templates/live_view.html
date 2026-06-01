@@ -212,9 +212,18 @@
         element.style.borderColor = color;
       }
 
-      setInterval(() => {
-        img.src = "/devices/{{ device.id }}/frame/?t=" + new Date().getTime();
-      }, intervalMs);
+      let frameRefreshTimer;
+
+      function scheduleNextFrame() {
+        clearTimeout(frameRefreshTimer);
+        frameRefreshTimer = setTimeout(() => {
+          img.src = "/devices/{{ device.id }}/frame/?t=" + new Date().getTime();
+        }, intervalMs);
+      }
+
+      img.addEventListener("load", scheduleNextFrame);
+      img.addEventListener("error", scheduleNextFrame);
+      scheduleNextFrame();
 
       function updateStatus() {
         fetch("/devices/{{ device.id }}/live/", {

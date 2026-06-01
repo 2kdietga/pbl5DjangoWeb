@@ -1,4 +1,6 @@
 import os
+import logging
+import time
 
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -9,7 +11,11 @@ from ai.phone.state import PHONE_STATE_STORE
 from .models import Device
 
 
+logger = logging.getLogger(__name__)
+
+
 def device_latest_frame(request, id):
+    started_at = time.perf_counter()
     device = get_object_or_404(Device, id=id)
 
     if not device.latest_frame:
@@ -19,7 +25,22 @@ def device_latest_frame(request, id):
     if not os.path.exists(frame_path):
         raise Http404("Frame file not found")
 
-    return FileResponse(open(frame_path, "rb"), content_type="image/jpeg")
+    file_started_at = time.perf_counter()
+    frame_file = open(frame_path, "rb")
+    if getattr(settings, "LIVE_FRAME_DEBUG", False):
+        logger.warning(
+            "[LIVE_FRAME] serve device=%s file=%s bytes=%s query_ms=%.2f open_ms=%.2f total_ms=%.2f",
+            device.id,
+            device.latest_frame.name,
+            os.path.getsize(frame_path),
+            (file_started_at - started_at) * 1000,
+            (time.perf_counter() - file_started_at) * 1000,
+            (time.perf_counter() - started_at) * 1000,
+        )
+
+    response = FileResponse(frame_file, content_type="image/jpeg")
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 def device_live_view(request, id):

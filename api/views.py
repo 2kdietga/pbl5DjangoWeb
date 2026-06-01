@@ -1,4 +1,6 @@
 from datetime import timedelta
+import logging
+import time
 
 from django.utils import timezone
 from django.conf import settings
@@ -17,15 +19,41 @@ from ai.phone.engine import process_frame as process_phone_frame
 from ai.drowsiness.video_utils import export_frames_to_mp4
 
 
+logger = logging.getLogger(__name__)
+
+
 class UploadAndDetectAPIView(APIView):
     authentication_classes = []
     permission_classes = []
 
     def post(self, request):
+        started_at = time.perf_counter()
+        last_mark_at = started_at
+
+        def mark(stage, **values):
+            nonlocal last_mark_at
+            if not getattr(settings, "UPLOAD_DEBUG", False):
+                return
+
+            now = time.perf_counter()
+            details = " ".join(f"{key}={value}" for key, value in values.items())
+            logger.warning(
+                "[UPLOAD] stage=%s step_ms=%.2f total_ms=%.2f%s%s",
+                stage,
+                (now - last_mark_at) * 1000,
+                (now - started_at) * 1000,
+                " " if details else "",
+                details,
+            )
+            last_mark_at = now
+
+        mark("request-start", content_length=request.META.get("CONTENT_LENGTH", ""))
+
         # ===== 1. IMAGE =====
         try:
             image = request.FILES.get("image")
         except Exception as e:
+            mark("multipart-error", error=type(e).__name__)
             return Response(
                 {
                     "detail": "Upload interrupted",
@@ -35,11 +63,14 @@ class UploadAndDetectAPIView(APIView):
             )
 
         if not image:
+            mark("missing-image")
             return Response({"detail": "Missing image"}, status=400)
+        mark("multipart-parsed", image_bytes=image.size)
 
         # ===== 2. DEVICE =====
         token = request.headers.get("X-DEVICE-TOKEN")
         if not token:
+            mark("missing-device-token")
             return Response({"detail": "Missing X-DEVICE-TOKEN"}, status=401)
 
         device = (
@@ -49,17 +80,22 @@ class UploadAndDetectAPIView(APIView):
         )
 
         if not device:
+            mark("invalid-device")
             return Response({"detail": "Invalid device token"}, status=401)
+        mark("device-loaded", device=device.id)
 
         device.last_seen = timezone.now()
         device.save(update_fields=["last_seen"])
+        mark("last-seen-saved")
 
         # ===== 3. SAVE LIVE FRAME =====
         try:
             image.seek(0)
             save_latest_frame(device, image)
             image.seek(0)
+            mark("latest-frame-saved")
         except Exception as e:
+            mark("latest-frame-error", error=type(e).__name__)
             return Response(
                 {
                     "detail": "Failed to save latest frame",
@@ -71,15 +107,19 @@ class UploadAndDetectAPIView(APIView):
         # ===== 4. DRIVER =====
         card_uid = (request.data.get("card_uid") or "").strip()
         if not card_uid:
+            mark("missing-card-uid")
             return Response({"detail": "Missing card_uid"}, status=400)
 
         reporter = Account.objects.filter(card_uid=card_uid).first()
         if not reporter:
+            mark("driver-not-found")
             return Response({"detail": "Driver not found"}, status=404)
+        mark("driver-loaded", driver=reporter.id)
 
         # ===== 5. VEHICLE =====
         vehicle = device.vehicle
         if vehicle is None:
+            mark("missing-vehicle")
             return Response({"detail": "Device has no vehicle"}, status=400)
 
         # ===== 6. AI =====
@@ -87,14 +127,18 @@ class UploadAndDetectAPIView(APIView):
             image.seek(0)
             result = process_frame(image, device.token)
             image.seek(0)
+            mark("drowsiness-finished", status=result.get("status", "UNKNOWN"))
         except Exception as e:
+            mark("drowsiness-error", error=type(e).__name__)
             return Response({"detail": f"AI error: {str(e)}"}, status=500)
 
         try:
             image.seek(0)
             phone_result = process_phone_frame(image, device.token)
             image.seek(0)
+            mark("phone-finished", status=phone_result.get("status", "UNKNOWN"))
         except Exception as e:
+            mark("phone-error", error=type(e).__name__)
             return Response({"detail": f"Phone AI error: {str(e)}"}, status=500)
 
         # ===== 7. READ RESULT =====
@@ -143,6 +187,7 @@ class UploadAndDetectAPIView(APIView):
 
         # ===== 8. NO VIOLATION =====
         if not should_create_any_violation:
+            mark("response-no-violation")
             return Response(
                 {
                     "ok": True,
@@ -210,6 +255,7 @@ class UploadAndDetectAPIView(APIView):
             video_frames = phone_video_frames
 
         category, _ = Category.objects.get_or_create(name=category_name)
+        mark("category-loaded", category=category.id)
 
         # ===== 10. COOLDOWN =====
         now = timezone.now()
@@ -221,6 +267,7 @@ class UploadAndDetectAPIView(APIView):
         ).first()
 
         if recent:
+            mark("response-cooldown", violation=recent.id)
             return Response(
                 {
                     "ok": True,
@@ -254,7 +301,9 @@ class UploadAndDetectAPIView(APIView):
         try:
             fps = int(getattr(settings, "DROWSINESS_FPS", 5))
             video_rel_path = export_frames_to_mp4(video_frames, fps=fps)
+            mark("video-exported", has_video=bool(video_rel_path))
         except Exception as e:
+            mark("video-export-error", error=type(e).__name__)
             return Response(
                 {
                     "detail": "Failed to export violation video",
@@ -272,10 +321,12 @@ class UploadAndDetectAPIView(APIView):
             description=violation_description,
             video=video_rel_path,   # nếu model đã có field video
         )
+        mark("violation-created", violation=violation.id)
 
         # giữ ảnh tĩnh làm thumbnail / fallback
         image.seek(0)
         violation.image.save(image.name, image, save=True)
+        mark("response-violation", violation=violation.id)
 
         return Response(
             {

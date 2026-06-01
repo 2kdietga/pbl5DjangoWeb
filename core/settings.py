@@ -187,3 +187,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Temporary diagnostics for the rotating live-frame files.
+LIVE_FRAME_DEBUG = False
+UPLOAD_DEBUG = False
