@@ -1,8 +1,5 @@
-{% extends "base.html" %}
-
-{% block title %}Duyệt kháng cáo #{{ appeal.id }} | QL Vi phạm{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Duyệt kháng cáo #{{ appeal.id }} | QL
+Vi phạm{% endblock %} {% block content %}
 <div class="detail-toolbar">
   <a href="{% url 'appeal_review_list' %}" class="btn btn-link px-0">
     ← Quay lại danh sách
@@ -17,19 +14,11 @@
         <h2>Bằng chứng vi phạm</h2>
       </div>
 
-      {% if violation.image %}
-      <img
-        src="{{ violation.image.url }}"
-        class="evidence-media mb-3"
-        alt="Bằng chứng"
-      />
-      {% endif %}
       {% if violation.video %}
       <video class="evidence-media" controls>
         <source src="{{ violation.video.url }}" />
       </video>
-      {% endif %}
-      {% if not violation.image and not violation.video %}
+      {% endif %} {% if not violation.image and not violation.video %}
       <div class="empty-state evidence-empty">
         <strong>Không có bằng chứng</strong>
         <span>Chưa có hình ảnh hoặc video cho hồ sơ này.</span>
