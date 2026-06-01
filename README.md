@@ -26,7 +26,7 @@ core/
   accounts/        Custom user, auth, profile, card_uid
   ai/
     drowsiness/    Landmark-98 reference pipeline for EAR/yaw detection
-    phone/         CNN + GRU phone usage detection
+    phone/         CNN + GRU + Attention phone usage detection
     models/        AI model weights
   api/             Upload frame API
   categories/      Violation categories
@@ -70,7 +70,7 @@ Luồng xử lý:
 Tài liệu mô tả 2 pipeline AI xử lý frame upload:
 
 - Drowsiness + Head Turn: đặc tả theo model landmark 98 điểm.
-- Phone Usage: dùng model video classification CNN + GRU.
+- Phone Usage: dùng model video classification CNN + GRU + Temporal Attention.
 
 State AI hiện lưu trong RAM theo `device_key`. Cách này phù hợp demo/prototype và cấu hình `Gunicorn --workers 1`. Nếu scale nhiều worker/server, cần chuyển state sang Redis hoặc storage dùng chung.
 
@@ -236,12 +236,12 @@ Các giá trị `status` có thể gặp:
 File weights:
 
 ```text
-ai/models/model_ep26_val0.9268.pth
+ai/models/best_model_ep25_f10.9134.pth
 ```
 
 Module liên quan:
 
-- `ai/phone/model.py`: định nghĩa `PhoneCNNGRU`.
+- `ai/phone/model.py`: định nghĩa `PhoneCNNGRU` và `TemporalAttention`.
 - `ai/phone/engine.py`: load model, gom sequence frame, predict phone usage.
 - `ai/phone/state.py`: lưu frame buffer theo device.
 
@@ -388,7 +388,7 @@ DROWSINESS_HEAD_TURN_VIOLATION_FRAMES = 2 * DROWSINESS_FPS
 DROWSINESS_HEAD_TURN_DECAY = 1
 DROWSINESS_BUFFER_SECONDS = 5
 
-PHONE_MODEL_PATH = BASE_DIR / "ai" / "models" / "model_ep26_val0.9268.pth"
+PHONE_MODEL_PATH = BASE_DIR / "ai" / "models" / "best_model_ep25_f10.9134.pth"
 PHONE_CATEGORY_NAME = "Phone"
 PHONE_VIOLATION_COOLDOWN_SECONDS = 30
 PHONE_SEQUENCE_LENGTH = 12

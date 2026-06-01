@@ -27,13 +27,13 @@ def read_frame(image_file):
 
 def preprocess_frame(frame_rgb):
     image_size = int(getattr(settings, "PHONE_IMAGE_SIZE", 112))
-    resized = cv2.resize(frame_rgb, (image_size, image_size), interpolation=cv2.INTER_AREA)
+    resized = cv2.resize(frame_rgb, (image_size, image_size), interpolation=cv2.INTER_LINEAR)
     tensor = torch.from_numpy(resized).float().permute(2, 0, 1) / 255.0
     return (tensor - _IMAGENET_MEAN) / _IMAGENET_STD
 
 
 def get_model_path():
-    default_path = settings.BASE_DIR / "ai" / "models" / "model_ep26_val0.9268.pth"
+    default_path = settings.BASE_DIR / "ai" / "models" / "best_model_ep25_f10.9134.pth"
     return str(getattr(settings, "PHONE_MODEL_PATH", default_path))
 
 

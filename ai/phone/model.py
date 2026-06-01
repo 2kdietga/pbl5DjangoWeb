@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 
 class LightCNN(nn.Module):
@@ -33,6 +34,17 @@ class LightCNN(nn.Module):
         return torch.flatten(x, 1)
 
 
+class TemporalAttention(nn.Module):
+    def __init__(self, hidden_size=64):
+        super().__init__()
+        self.attn = nn.Linear(hidden_size, 1)
+
+    def forward(self, gru_out):
+        scores = self.attn(gru_out)
+        weights = F.softmax(scores, dim=1)
+        return (gru_out * weights).sum(dim=1), weights
+
+
 class PhoneCNNGRU(nn.Module):
     def __init__(self, num_classes=2):
         super().__init__()
@@ -44,6 +56,7 @@ class PhoneCNNGRU(nn.Module):
             batch_first=True,
             dropout=0.3,
         )
+        self.attention = TemporalAttention(hidden_size=64)
         self.classifier = nn.Sequential(
             nn.BatchNorm1d(64),
             nn.Linear(64, 32),
@@ -57,5 +70,6 @@ class PhoneCNNGRU(nn.Module):
         x = x.view(batch_size * time_steps, channels, height, width)
         features = self.cnn(x)
         features = features.view(batch_size, time_steps, -1)
-        _, hidden = self.gru(features)
-        return self.classifier(hidden[-1])
+        gru_out, _ = self.gru(features)
+        context, _ = self.attention(gru_out)
+        return self.classifier(context)

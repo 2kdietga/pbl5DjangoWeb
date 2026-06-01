@@ -123,7 +123,7 @@ DROWSINESS_BUFFER_SECONDS = 5 # số giây dữ liệu buffer cho mỗi thiết 
 
 
 # PHONE USAGE VIDEO CLASSIFICATION SETTINGS
-PHONE_MODEL_PATH = BASE_DIR / "ai" / "models" / "model_ep26_val0.9268.pth"
+PHONE_MODEL_PATH = BASE_DIR / "ai" / "models" / "best_model_ep25_f10.9134.pth"
 PHONE_CATEGORY_NAME = "Phone"
 PHONE_VIOLATION_COOLDOWN_SECONDS = 30
 PHONE_SEQUENCE_LENGTH = 12
