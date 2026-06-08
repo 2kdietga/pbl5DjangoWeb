@@ -26,4 +26,4 @@ RUN python manage.py collectstatic --noinput
 
 EXPOSE 10000
 
-CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:10000", "--workers", "1", "--timeout", "120"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn core.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 1 --timeout 120"]

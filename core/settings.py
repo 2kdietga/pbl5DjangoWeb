@@ -21,12 +21,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-!a9(5ic6lv4#i3rcuvsi$_dn15v=@j^oq&#dy$*(r-ne4vyq_&'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-!a9(5ic6lv4#i3rcuvsi$_dn15v=@j^oq&#dy$*(r-ne4vyq_&',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes', 'on')
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
 
 # Application definition
@@ -128,7 +131,7 @@ PHONE_CATEGORY_NAME = "Phone"
 PHONE_VIOLATION_COOLDOWN_SECONDS = 30
 PHONE_SEQUENCE_LENGTH = 12
 PHONE_IMAGE_SIZE = 112
-PHONE_CONFIDENCE_THRESHOLD = 0.77
+PHONE_CONFIDENCE_THRESHOLD = 0.7
 PHONE_CLASS_LABELS = ["Safe", "Phone"]
 
 # Database
@@ -177,8 +180,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'static'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = ['core/static']
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
