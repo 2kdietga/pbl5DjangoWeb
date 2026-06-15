@@ -108,12 +108,30 @@ class UploadAndDetectAPIView(APIView):
         card_uid = (request.data.get("card_uid") or "").strip()
         if not card_uid:
             mark("missing-card-uid")
-            return Response({"detail": "Missing card_uid"}, status=400)
+            return Response(
+                {
+                    "ok": False,
+                    "card_valid": False,
+                    "invalid_card": True,
+                    "card_uid": card_uid,
+                    "detail": "Missing card_uid",
+                },
+                status=200,
+            )
 
         reporter = Account.objects.filter(card_uid=card_uid).first()
         if not reporter:
             mark("driver-not-found")
-            return Response({"detail": "Driver not found"}, status=404)
+            return Response(
+                {
+                    "ok": False,
+                    "card_valid": False,
+                    "invalid_card": True,
+                    "card_uid": card_uid,
+                    "detail": "Driver not found",
+                },
+                status=200,
+            )
         mark("driver-loaded", driver=reporter.id)
 
         # ===== 5. VEHICLE =====
@@ -211,6 +229,9 @@ class UploadAndDetectAPIView(APIView):
                     "violation_kind": active_violation_kind,
                     "vehicle": vehicle.license_plate,
                     "driver": reporter.username,
+                    "card_valid": True,
+                    "invalid_card": False,
+                    "card_uid": card_uid,
                 },
                 status=200,
             )
@@ -292,6 +313,9 @@ class UploadAndDetectAPIView(APIView):
                     "cooldown_seconds": cooldown,
                     "violation_id": recent.id,
                     "violation_kind": violation_kind,
+                    "card_valid": True,
+                    "invalid_card": False,
+                    "card_uid": card_uid,
                 },
                 status=200,
             )
@@ -351,6 +375,9 @@ class UploadAndDetectAPIView(APIView):
                 "violation_id": violation.id,
                 "violation_kind": violation_kind,
                 "has_video": bool(video_rel_path),
+                "card_valid": True,
+                "invalid_card": False,
+                "card_uid": card_uid,
             },
             status=201,
         )

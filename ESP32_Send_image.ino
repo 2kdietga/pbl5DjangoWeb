@@ -42,6 +42,7 @@ const size_t WRITE_CHUNK_SIZE = 1024;
 // ===== BIẾN TOÀN CỤC =====
 WiFiClient client;
 volatile bool isShooting = false;
+volatile bool cardConfirmed = false;
 char currentRFID[32] = "";
 
 portMUX_TYPE sharedMux = portMUX_INITIALIZER_UNLOCKED;
@@ -282,22 +283,55 @@ bool readHttpResponseBody(WiFiClient& c, String& body, int& statusCode, int& con
 }
 
 void handleServerJson(const String& jsonOnly) {
+  bool invalidCard = extractJSONBool(jsonOnly, "\"invalid_card\"");
+  bool cardValid = extractJSONBool(jsonOnly, "\"card_valid\"");
   bool isViolation = extractJSONBool(jsonOnly, "\"created\"");
   int streakVal = extractJSONInt(jsonOnly, "\"eye_closed_streak\"");
   int turnVal = extractJSONInt(jsonOnly, "\"head_turn_score\"");
   String kind = extractJSONString(jsonOnly, "\"violation_kind\"");
   String pStatus = extractJSONString(jsonOnly, "\"phone_status\"");
 
-  Serial.printf("[AI] created=%d, streak=%d, turn=%d, kind=%s, phone=%s\n",
-                isViolation, streakVal, turnVal, kind.c_str(), pStatus.c_str());
+  Serial.printf("[AI] card_valid=%d, invalid_card=%d, created=%d, streak=%d, turn=%d, kind=%s, phone=%s\n",
+                cardValid, invalidCard, isViolation, streakVal, turnVal, kind.c_str(), pStatus.c_str());
+
+  if (invalidCard) {
+    portENTER_CRITICAL(&sharedMux);
+    isShooting = false;
+    cardConfirmed = false;
+    currentRFID[0] = '\0';
+    portEXIT_CRITICAL(&sharedMux);
+
+    Serial.println("UART_CMD:INVALID_CARD");
+    return;
+  }
 
   if (isViolation) {
+    portENTER_CRITICAL(&sharedMux);
+    cardConfirmed = true;
+    portEXIT_CRITICAL(&sharedMux);
+
     if (kind == "eye") {
       Serial.println("UART_CMD:SLEEP");
     } else if (pStatus == "PHONE" || kind == "phone") {
       Serial.println("UART_CMD:PHONE");
     } else if (kind == "head") {
       Serial.println("UART_CMD:TURN");
+    }
+    return;
+  }
+
+  if (cardValid) {
+    bool shouldNotifyCardOk = false;
+
+    portENTER_CRITICAL(&sharedMux);
+    if (!cardConfirmed) {
+      cardConfirmed = true;
+      shouldNotifyCardOk = true;
+    }
+    portEXIT_CRITICAL(&sharedMux);
+
+    if (shouldNotifyCardOk) {
+      Serial.println("UART_CMD:CARD_OK");
     }
   }
 }
@@ -490,6 +524,7 @@ void loop() {
 
       portENTER_CRITICAL(&sharedMux);
       isShooting = true;
+      cardConfirmed = false;
       strlcpy(currentRFID, rfid_code.c_str(), sizeof(currentRFID));
       portEXIT_CRITICAL(&sharedMux);
 

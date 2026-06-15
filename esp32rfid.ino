@@ -35,6 +35,12 @@ const uint8_t alarm_turn_mp3[] PROGMEM = {
 
 };
 
+// 5. The khong hop le
+const uint8_t invalid_card_mp3[] PROGMEM = {
+ //them file am thanh "the khong hop le" vao day
+
+};
+
 AudioGeneratorMP3 *mp3;
 AudioFileSourcePROGMEM *file;
 AudioOutputI2S *out;
@@ -56,7 +62,7 @@ void setup() {
   out->SetGain(0.8); 
   
   mp3 = new AudioGeneratorMP3();
-  Serial.println("\n[ESP32 THUONG] San sang quet the va phat 4 loai am thanh...");
+  Serial.println("\n[ESP32 THUONG] San sang quet the va phat 5 loai am thanh...");
 }
 
 void loop() {
@@ -94,6 +100,18 @@ void loop() {
         mp3->begin(file, out);
         isPlaying = true;
       }
+      else if (cmd == "UART_CMD:CARD_OK") {
+        Serial.println("[RFID] Server xac nhan the hop le -> Phat loa");
+        file = new AudioFileSourcePROGMEM(success_mp3, sizeof(success_mp3));
+        mp3->begin(file, out);
+        isPlaying = true;
+      }
+      else if (cmd == "UART_CMD:INVALID_CARD") {
+        Serial.println("[RFID] Server bao the khong hop le -> Phat loa");
+        file = new AudioFileSourcePROGMEM(invalid_card_mp3, sizeof(invalid_card_mp3));
+        mp3->begin(file, out);
+        isPlaying = true;
+      }
     }
   }
 
@@ -108,14 +126,8 @@ void loop() {
       uid.toUpperCase();
 
       Serial.println("[RFID] Da quet the: " + uid);
+      Serial.println("[RFID] Gui UID sang ESP32-CAM de server xac thuc");
       Serial2.println(uid); 
-
-      if (!isPlaying) {
-        Serial.println("[LOA] Phat: Quet the thanh cong");
-        file = new AudioFileSourcePROGMEM(success_mp3, sizeof(success_mp3));
-        mp3->begin(file, out);
-        isPlaying = true;
-      }
       lastScanTime = millis(); 
     }
     rfid.PICC_HaltA();
